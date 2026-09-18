@@ -27,6 +27,7 @@ import org.folio.entitlement.domain.model.EntitlementRequest;
 import org.folio.entitlement.mapper.FlowMapper;
 import org.folio.entitlement.repository.FlowRepository;
 import org.folio.entitlement.service.FlowStageService;
+import org.folio.entitlement.service.InstanceContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +41,7 @@ public class FlowService {
   private final FlowRepository flowRepository;
   private final FlowStageService flowStageService;
   private final ApplicationFlowService applicationFlowService;
+  private final InstanceContext instanceContext;
 
   /**
    * Retrieves {@link ApplicationFlow} by query and pagination parameters (limit, offset).
@@ -93,7 +95,8 @@ public class FlowService {
    *
    * <p>An already existing row is expected to be the FAILED one inserted by {@link #createFailed} for a flow that
    * timed out before it was scheduled - such a flow must not be started, so this method throws instead of
-   * overwriting, reporting the actual status of the existing row.</p>
+   * overwriting, reporting the actual status of the existing row. The created row is stamped with the identifier
+   * of the current MTE instance (see {@link InstanceContext}), which becomes the owner of the flow.</p>
    *
    * @param flow - flow representation
    * @return created {@link Flow} entity
@@ -109,6 +112,7 @@ public class FlowService {
     }
 
     var flowEntity = flowMapper.map(flow);
+    flowEntity.setOwnerInstanceId(instanceContext.getInstanceId());
     var savedEntity = flowRepository.save(flowEntity);
     return flowMapper.map(savedEntity);
   }
@@ -128,7 +132,9 @@ public class FlowService {
       .status(ExecutionStatus.FAILED)
       .type(request.getType());
 
-    flowRepository.saveAndFlush(flowMapper.map(flow));
+    var flowEntity = flowMapper.map(flow);
+    flowEntity.setOwnerInstanceId(instanceContext.getInstanceId());
+    flowRepository.saveAndFlush(flowEntity);
     log.warn("Flow timed out before it was started, created as failed [flowId: {}]", flowId);
   }
 
@@ -182,6 +188,25 @@ public class FlowService {
       .orElseGet(() -> flowRepository.getReferenceById(flowId));
 
     return flowMapper.map(topLevelFlow);
+  }
+
+  /**
+   * Resolves the owner of a flow by a root flow or application flow identifier.
+   *
+   * <p>Application flow rows do not store ownership themselves - it is resolved through the referenced root flow.
+   * The result is empty when the flow was created before flow ownership was introduced (a null owner), so such
+   * legacy flows can be recognized and handled as stale ones by the recovery logic.</p>
+   *
+   * @param flowId - root flow or application flow identifier as {@link UUID}
+   * @return the owner instance identifier as {@link Optional} of {@link UUID}
+   */
+  @Transactional(readOnly = true)
+  public Optional<UUID> findOwnerInstanceId(UUID flowId) {
+    var rootFlowId = applicationFlowService.findById(flowId)
+      .map(ApplicationFlow::getFlowId)
+      .orElse(flowId);
+
+    return Optional.ofNullable(flowRepository.getReferenceById(rootFlowId).getOwnerInstanceId());
   }
 
   public int finishFlowIfNoActiveStages(UUID flowId, ZonedDateTime finishedAt) {

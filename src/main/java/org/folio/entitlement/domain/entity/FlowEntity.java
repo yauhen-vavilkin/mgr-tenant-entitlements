@@ -33,4 +33,13 @@ public class FlowEntity extends AbstractFlowEntity {
   @JdbcTypeCode(SqlTypes.NAMED_ENUM)
   @Column(name = "type", columnDefinition = "entitlement_flow_type")
   private EntityFlowEntitlementType type;
+
+  /**
+   * An identifier of the MTE application instance that owns (executes) this flow.
+   *
+   * <p>Deliberately nullable: flows created before flow ownership was introduced have no owner, and such rows
+   * remain readable and eligible for stale-flow handling by the recovery logic.</p>
+   */
+  @Column(name = "owner_instance_id")
+  private UUID ownerInstanceId;
 }

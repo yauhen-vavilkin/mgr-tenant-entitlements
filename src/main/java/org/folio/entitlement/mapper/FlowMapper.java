@@ -20,6 +20,11 @@ public interface FlowMapper {
   @Mapping(target = "applicationFlows", ignore = true)
   Flow map(FlowEntity entity);
 
+  /**
+   * The owner instance id is deliberately not mapped from the API representation: it is stamped with the current
+   * MTE instance identifier by {@link org.folio.entitlement.service.flow.FlowService#create(Flow)} on persist.
+   */
+  @Mapping(target = "ownerInstanceId", ignore = true)
   FlowEntity map(Flow entity);
 
   List<Flow> map(List<FlowEntity> entity);

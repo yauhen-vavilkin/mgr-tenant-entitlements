@@ -10,6 +10,7 @@ import static org.folio.entitlement.service.FlowServiceTest.TestValues.flowEntit
 import static org.folio.entitlement.support.TestConstants.APPLICATION_FLOW_ID;
 import static org.folio.entitlement.support.TestConstants.APPLICATION_ID;
 import static org.folio.entitlement.support.TestConstants.FLOW_ID;
+import static org.folio.entitlement.support.TestConstants.OWNER_INSTANCE_ID;
 import static org.folio.entitlement.support.TestConstants.TENANT_ID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -66,6 +67,7 @@ class FlowServiceTest {
   @Mock private FlowRepository flowRepository;
   @Mock private FlowStageService flowStageService;
   @Mock private ApplicationFlowService applicationFlowService;
+  @Mock private InstanceContext instanceContext;
 
   @AfterEach
   void tearDown() {
@@ -170,15 +172,18 @@ class FlowServiceTest {
     void positive() {
       var flow = flow();
       var flowEntity = flowEntity();
+      var savedEntityCaptor = ArgumentCaptor.forClass(FlowEntity.class);
 
       when(flowRepository.findStatusById(FLOW_ID)).thenReturn(Optional.empty());
       when(flowMapper.map(flow)).thenReturn(flowEntity);
-      when(flowRepository.save(flowEntity)).thenReturn(flowEntity);
+      when(instanceContext.getInstanceId()).thenReturn(OWNER_INSTANCE_ID);
+      when(flowRepository.save(savedEntityCaptor.capture())).thenReturn(flowEntity);
       when(flowMapper.map(flowEntity)).thenReturn(flow);
 
       var result = flowService.create(flow);
 
       assertThat(result).isEqualTo(flow);
+      assertThat(savedEntityCaptor.getValue().getOwnerInstanceId()).isEqualTo(OWNER_INSTANCE_ID);
     }
 
     @Test
@@ -203,15 +208,17 @@ class FlowServiceTest {
     @Test
     void positive() {
       var flowEntity = flowEntity();
-      var request = EntitlementRequest.builder()
+      var flowCaptor = ArgumentCaptor.forClass(Flow.class);
+      var savedEntityCaptor = ArgumentCaptor.forClass(FlowEntity.class);
+      final var request = EntitlementRequest.builder()
         .applications(List.of(APPLICATION_ID))
         .tenantId(TENANT_ID)
         .type(ENTITLE)
         .build();
-      var flowCaptor = ArgumentCaptor.forClass(Flow.class);
 
       when(flowMapper.map(flowCaptor.capture())).thenReturn(flowEntity);
-      when(flowRepository.saveAndFlush(flowEntity)).thenReturn(flowEntity);
+      when(instanceContext.getInstanceId()).thenReturn(OWNER_INSTANCE_ID);
+      when(flowRepository.saveAndFlush(savedEntityCaptor.capture())).thenReturn(flowEntity);
 
       flowService.createFailed(FLOW_ID, request);
 
@@ -222,6 +229,7 @@ class FlowServiceTest {
       assertThat(mappedFlow.getType()).isEqualTo(ENTITLE);
       assertThat(mappedFlow.getStartedAt()).isNull();
       assertThat(mappedFlow.getFinishedAt()).isNull();
+      assertThat(savedEntityCaptor.getValue().getOwnerInstanceId()).isEqualTo(OWNER_INSTANCE_ID);
     }
   }
 
@@ -327,6 +335,48 @@ class FlowServiceTest {
       var result = flowService.getTopLevelFlow(FLOW_ID);
 
       assertThat(result).isEqualTo(expectedFlow);
+    }
+  }
+
+  @Nested
+  @DisplayName("findOwnerInstanceId")
+  class FindOwnerInstanceId {
+
+    @Test
+    void positive_idIsApplicationFlowId() {
+      var applicationFlow = new ApplicationFlow().id(APPLICATION_FLOW_ID).flowId(FLOW_ID);
+      var flowEntity = flowEntity();
+      flowEntity.setOwnerInstanceId(OWNER_INSTANCE_ID);
+
+      when(applicationFlowService.findById(APPLICATION_FLOW_ID)).thenReturn(Optional.of(applicationFlow));
+      when(flowRepository.getReferenceById(FLOW_ID)).thenReturn(flowEntity);
+
+      var result = flowService.findOwnerInstanceId(APPLICATION_FLOW_ID);
+
+      assertThat(result).contains(OWNER_INSTANCE_ID);
+    }
+
+    @Test
+    void positive_idIsRootFlowId() {
+      var flowEntity = flowEntity();
+      flowEntity.setOwnerInstanceId(OWNER_INSTANCE_ID);
+
+      when(applicationFlowService.findById(FLOW_ID)).thenReturn(Optional.empty());
+      when(flowRepository.getReferenceById(FLOW_ID)).thenReturn(flowEntity);
+
+      var result = flowService.findOwnerInstanceId(FLOW_ID);
+
+      assertThat(result).contains(OWNER_INSTANCE_ID);
+    }
+
+    @Test
+    void positive_ownerIsNotSetForLegacyFlow() {
+      when(applicationFlowService.findById(FLOW_ID)).thenReturn(Optional.empty());
+      when(flowRepository.getReferenceById(FLOW_ID)).thenReturn(flowEntity());
+
+      var result = flowService.findOwnerInstanceId(FLOW_ID);
+
+      assertThat(result).isEmpty();
     }
   }
 

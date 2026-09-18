@@ -20,6 +20,9 @@
 * [Kong] Module routes are incorrectly assigned to multiple gateway services (MGRENTITLE-197)
 * Filter wildcard permissionsRequired entries from mgr-tenant-entitlements capability warnings (MGRENTITLE-182)
 * Accept a tenant collection name (e.g. `ALL`) in `KAFKA_PRODUCER_TENANT_COLLECTION`, as other FOLIO modules do (MGRENTITLE-202)
+* Establish flow ownership for entitlement operations: each MTE instance generates and logs a unique instance ID at
+  startup and stamps it as `owner_instance_id` of every root flow it creates, so recovery can distinguish active
+  flows from ones abandoned by a crashed or restarted process (MGRENTITLE-188)
 
 ---
 

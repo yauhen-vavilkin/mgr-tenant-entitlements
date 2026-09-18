@@ -1,0 +1,19 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.9.xsd">
+
+  <!--
+    Identifies the MTE application instance that owns (executes) a flow, so a later request can distinguish an
+    active flow from one abandoned by a crashed or restarted process. Nullable by design: flows created before this
+    column was added have no owner - they stay readable and are eligible for stale-flow handling by the recovery
+    logic. Application flow rows do not carry the column: their ownership is resolved through the parent flow row.
+  -->
+  <changeSet id="add-owner-instance-id-to-flow" author="yauhen-vavilkin">
+    <addColumn tableName="flow">
+      <column name="owner_instance_id" type="uuid"/>
+    </addColumn>
+  </changeSet>
+
+</databaseChangeLog>
