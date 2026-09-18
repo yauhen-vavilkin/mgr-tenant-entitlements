@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.folio.entitlement.domain.dto.ExecutionStatus;
 import org.folio.entitlement.domain.dto.Flow;
 import org.folio.entitlement.domain.model.CommonStageContext;
+import org.folio.entitlement.service.InstanceContext;
 import org.folio.entitlement.service.flow.FlowService;
 import org.springframework.stereotype.Component;
 
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Component;
 public class FlowInitializer extends DatabaseLoggingStage<CommonStageContext> {
 
   private final FlowService flowService;
+  private final InstanceContext instanceContext;
 
   @Override
   public void execute(CommonStageContext context) {
@@ -21,6 +23,7 @@ public class FlowInitializer extends DatabaseLoggingStage<CommonStageContext> {
     var flow = new Flow()
       .id(context.getCurrentFlowId())
       .tenantId(entitlementRequest.getTenantId())
+      .ownerInstanceId(instanceContext.getInstanceId())
       .status(ExecutionStatus.IN_PROGRESS)
       .type(entitlementRequest.getType())
       .startedAt(Date.from(Instant.now()));
