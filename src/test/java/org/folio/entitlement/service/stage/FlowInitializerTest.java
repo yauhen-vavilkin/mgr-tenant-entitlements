@@ -41,7 +41,7 @@ class FlowInitializerTest {
   }
 
   @Test
-  void execute_stampsOwnerInstanceId() {
+  void execute_positive_stampsOwnerInstanceId() {
     var ownerInstanceId = UUID.randomUUID();
     var request = EntitlementRequest.builder().tenantId(TENANT_ID).type(ENTITLE).build();
     var context = commonStageContext(FLOW_ID, Map.of(PARAM_REQUEST, request), Map.of());
