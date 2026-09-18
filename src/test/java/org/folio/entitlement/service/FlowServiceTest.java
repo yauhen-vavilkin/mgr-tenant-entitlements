@@ -43,6 +43,7 @@ import org.folio.entitlement.mapper.FlowMapper;
 import org.folio.entitlement.repository.FlowRepository;
 import org.folio.entitlement.service.flow.ApplicationFlowService;
 import org.folio.entitlement.service.flow.FlowService;
+import org.folio.entitlement.service.instance.InstanceContext;
 import org.folio.entitlement.support.TestUtils;
 import org.folio.test.types.UnitTest;
 import org.junit.jupiter.api.AfterEach;
@@ -66,6 +67,7 @@ class FlowServiceTest {
   @Mock private FlowRepository flowRepository;
   @Mock private FlowStageService flowStageService;
   @Mock private ApplicationFlowService applicationFlowService;
+  @Mock private InstanceContext instanceContext;
 
   @AfterEach
   void tearDown() {
@@ -203,6 +205,8 @@ class FlowServiceTest {
     @Test
     void positive() {
       var flowEntity = flowEntity();
+      var ownerInstanceId = UUID.randomUUID();
+      when(instanceContext.getInstanceId()).thenReturn(ownerInstanceId);
       var request = EntitlementRequest.builder()
         .applications(List.of(APPLICATION_ID))
         .tenantId(TENANT_ID)
@@ -220,6 +224,7 @@ class FlowServiceTest {
       assertThat(mappedFlow.getTenantId()).isEqualTo(TENANT_ID);
       assertThat(mappedFlow.getStatus()).isEqualTo(ExecutionStatus.FAILED);
       assertThat(mappedFlow.getType()).isEqualTo(ENTITLE);
+      assertThat(mappedFlow.getOwnerInstanceId()).isEqualTo(ownerInstanceId);
       assertThat(mappedFlow.getStartedAt()).isNull();
       assertThat(mappedFlow.getFinishedAt()).isNull();
     }

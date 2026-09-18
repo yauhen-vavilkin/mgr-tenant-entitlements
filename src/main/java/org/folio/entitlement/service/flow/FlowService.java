@@ -27,6 +27,7 @@ import org.folio.entitlement.domain.model.EntitlementRequest;
 import org.folio.entitlement.mapper.FlowMapper;
 import org.folio.entitlement.repository.FlowRepository;
 import org.folio.entitlement.service.FlowStageService;
+import org.folio.entitlement.service.instance.InstanceContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +41,7 @@ public class FlowService {
   private final FlowRepository flowRepository;
   private final FlowStageService flowStageService;
   private final ApplicationFlowService applicationFlowService;
+  private final InstanceContext instanceContext;
 
   /**
    * Retrieves {@link ApplicationFlow} by query and pagination parameters (limit, offset).
@@ -125,6 +127,7 @@ public class FlowService {
     var flow = new Flow()
       .id(flowId)
       .tenantId(request.getTenantId())
+      .ownerInstanceId(instanceContext.getInstanceId())
       .status(ExecutionStatus.FAILED)
       .type(request.getType());
 

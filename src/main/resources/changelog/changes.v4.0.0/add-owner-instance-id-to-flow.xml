@@ -1,0 +1,14 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.9.xsd">
+
+  <!-- Nullable for compatibility with flows created before ownership was introduced. -->
+  <changeSet id="add-owner-instance-id-to-flow" author="folio">
+    <addColumn tableName="flow">
+      <column name="owner_instance_id" type="UUID"/>
+    </addColumn>
+  </changeSet>
+
+</databaseChangeLog>
