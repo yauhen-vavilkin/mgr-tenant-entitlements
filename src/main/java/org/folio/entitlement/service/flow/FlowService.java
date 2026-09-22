@@ -100,6 +100,13 @@ public class FlowService {
    * @throws IllegalStateException if the flow row already exists
    */
   public Flow create(Flow flow) {
+    return create(flow, null);
+  }
+
+  /**
+   * Creates a root flow stamped with the owner MTE instance id (nullable).
+   */
+  public Flow create(Flow flow, String ownerInstanceId) {
     var flowId = requireNonNull(flow.getId());
     var existingStatus = flowRepository.findStatusById(flowId);
     if (existingStatus.isPresent()) {
@@ -109,6 +116,7 @@ public class FlowService {
     }
 
     var flowEntity = flowMapper.map(flow);
+    flowEntity.setOwnerInstanceId(ownerInstanceId);
     var savedEntity = flowRepository.save(flowEntity);
     return flowMapper.map(savedEntity);
   }
