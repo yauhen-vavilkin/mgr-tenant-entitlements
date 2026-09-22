@@ -23,6 +23,11 @@
       "type": "string",
       "format": "uuid"
     },
+    "ownerInstanceId": {
+      "description": "The MTE instance that owns the flow",
+      "type": "string",
+      "format": "uuid"
+    },
     "startedAt": {
       "description": "A control flow start timestamp",
       "type": "string",
