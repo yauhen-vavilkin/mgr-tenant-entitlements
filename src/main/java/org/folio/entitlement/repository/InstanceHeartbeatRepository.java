@@ -15,8 +15,12 @@ public interface InstanceHeartbeatRepository extends JpaRepository<InstanceHeart
   boolean existsByInstanceIdAndLastHeartbeatAfter(UUID instanceId, ZonedDateTime cutoff);
 
   @Modifying
-  @Query("UPDATE InstanceHeartbeatEntity e SET e.lastHeartbeat = :lastHeartbeat WHERE e.instanceId = :instanceId")
-  int updateHeartbeat(@Param("instanceId") UUID instanceId, @Param("lastHeartbeat") ZonedDateTime lastHeartbeat);
+  @Query(value = "INSERT INTO mte_instance (instance_id, started_at, last_heartbeat) "
+    + "VALUES (:instanceId, :startedAt, :lastHeartbeat) "
+    + "ON CONFLICT (instance_id) DO UPDATE SET last_heartbeat = EXCLUDED.last_heartbeat",
+    nativeQuery = true)
+  int upsertHeartbeat(@Param("instanceId") UUID instanceId, @Param("startedAt") ZonedDateTime startedAt,
+    @Param("lastHeartbeat") ZonedDateTime lastHeartbeat);
 
   @Modifying
   @Query("DELETE FROM InstanceHeartbeatEntity e WHERE e.lastHeartbeat < :cutoff")

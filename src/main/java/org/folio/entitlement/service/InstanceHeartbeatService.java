@@ -39,15 +39,11 @@ public class InstanceHeartbeatService {
 
   /** Refreshes the heartbeat independently from entitlement flow execution threads. */
   @Scheduled(fixedDelayString = "${application.instance-heartbeat.interval:10s}",
-    initialDelayString = "${application.instance-heartbeat.interval:10s}")
+    initialDelayString = "${application.instance-heartbeat.interval:10s}", scheduler = "heartbeatTaskScheduler")
   @Transactional
   public void updateHeartbeat() {
     try {
-      var updated = repository.updateHeartbeat(instanceContext.getInstanceId(), now());
-      if (updated == 0) {
-        log.error("MTE instance heartbeat was not updated because its record is missing [instanceId: {}]",
-          instanceContext.getInstanceId());
-      }
+      repository.upsertHeartbeat(instanceContext.getInstanceId(), instanceContext.getStartedAt(), now());
     } catch (Exception e) {
       log.error("Failed to update MTE instance heartbeat [instanceId: {}]", instanceContext.getInstanceId(), e);
     }
