@@ -3,6 +3,7 @@ package org.folio.entitlement.it;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import jakarta.persistence.EntityManager;
+import java.time.temporal.ChronoUnit;
 import org.folio.entitlement.repository.InstanceHeartbeatRepository;
 import org.folio.entitlement.service.InstanceContext;
 import org.folio.entitlement.support.base.BaseIntegrationTest;
@@ -27,7 +28,7 @@ class InstanceHeartbeatRepositoryIT extends BaseIntegrationTest {
   @Transactional
   void upsertHeartbeat_recreatesDeletedInstanceAndPreservesStartedAt() {
     var instanceId = instanceContext.getInstanceId();
-    var startedAt = instanceContext.getStartedAt();
+    var startedAt = instanceContext.getStartedAt().truncatedTo(ChronoUnit.MILLIS);
     repository.deleteById(instanceId);
     entityManager.flush();
 
