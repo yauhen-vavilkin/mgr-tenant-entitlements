@@ -1,0 +1,24 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.9.xsd">
+
+  <changeSet id="create-mte-instance-table" author="folio">
+    <createTable tableName="mte_instance">
+      <column name="instance_id" type="UUID">
+        <constraints nullable="false" primaryKey="true" primaryKeyName="pk_mte_instance"/>
+      </column>
+      <column name="started_at" type="TIMESTAMP WITH TIME ZONE">
+        <constraints nullable="false"/>
+      </column>
+      <column name="last_heartbeat" type="TIMESTAMP WITH TIME ZONE">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+    <createIndex tableName="mte_instance" indexName="idx_mte_instance_last_heartbeat">
+      <column name="last_heartbeat"/>
+    </createIndex>
+  </changeSet>
+
+</databaseChangeLog>
