@@ -105,6 +105,22 @@ class FlowRecoveryServiceTest {
     verify(applicationFlowRepository).updateStatusByFlowIdIfCurrentIn(eq(FLOW_ID), eq(INTERRUPTED), any(), any());
   }
 
+  @Test
+  void recover_returnsTrueWhenConcurrentRecoveryUpdatesLoseRace() {
+    var service = service();
+    when(flowRepository.findById(FLOW_ID)).thenReturn(Optional.of(parent(QUEUED, OWNER_ID)));
+    when(heartbeatService.isAlive(OWNER_ID)).thenReturn(false);
+    when(flowRepository.updateStatusIfCurrentIn(any(), eq(INTERRUPTED), any(), any())).thenReturn(0);
+    when(applicationFlowRepository.updateStatusByFlowIdIfCurrentIn(any(), eq(INTERRUPTED), any(), any()))
+      .thenReturn(0);
+
+    var result = service.recover(List.of(applicationFlow(QUEUED, FLOW_ID)));
+
+    assertThat(result).isTrue();
+    verify(flowRepository).updateStatusIfCurrentIn(eq(FLOW_ID), eq(INTERRUPTED), any(), any());
+    verify(applicationFlowRepository).updateStatusByFlowIdIfCurrentIn(eq(FLOW_ID), eq(INTERRUPTED), any(), any());
+  }
+
   private FlowRecoveryService service() {
     return new FlowRecoveryService(flowRepository, applicationFlowRepository, heartbeatService);
   }

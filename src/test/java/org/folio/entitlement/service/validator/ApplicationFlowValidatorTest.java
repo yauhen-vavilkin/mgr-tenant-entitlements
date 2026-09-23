@@ -88,6 +88,21 @@ class ApplicationFlowValidatorTest {
   }
 
   @Test
+  void validate_reloadsApplicationFlowsAfterRecoveryForNonStateRequest() {
+    var request = request(ENTITLE);
+    var blockingFlows = List.of(flow(EntitlementType.ENTITLE, QUEUED));
+    when(applicationFlowService.findLastFlowsByNames(getApplicationNames(request), TENANT_ID))
+      .thenReturn(blockingFlows, emptyList());
+    when(flowRecoveryService.recover(blockingFlows)).thenReturn(true);
+
+    validator.validate(request);
+
+    verify(applicationFlowService, org.mockito.Mockito.times(2))
+      .findLastFlowsByNames(getApplicationNames(request), TENANT_ID);
+    verify(flowRecoveryService).recover(blockingFlows);
+  }
+
+  @Test
   void validate_positive_stateRequest_delegatesToDesiredStateValidation() {
     var request = request(STATE);
 
