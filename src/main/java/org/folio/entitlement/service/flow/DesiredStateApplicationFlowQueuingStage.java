@@ -18,6 +18,9 @@ public class DesiredStateApplicationFlowQueuingStage extends DatabaseLoggingStag
   @Override
   @Transactional
   public void execute(CommonStageContext context) {
+    if (!guardFenceToken(context)) {
+      return;
+    }
     var tenantId = context.getEntitlementRequest().getTenantId();
     var transitionPlan = context.getApplicationStateTransitionPlan();
     var currentFlowId = context.getCurrentFlowId();

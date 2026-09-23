@@ -21,7 +21,11 @@ public class FolioModuleUpdater extends ModuleDatabaseLoggingStage {
   private final EntitlementModuleService moduleService;
 
   @Override
+  @SuppressWarnings("checkstyle:MethodLength")
   public void execute(ModuleStageContext context) {
+    if (!guardFenceToken(context)) {
+      return;
+    }
     threadLocalModuleStageContext.set(context);
 
     var moduleDescriptor = context.getModuleDescriptor();

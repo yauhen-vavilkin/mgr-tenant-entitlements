@@ -11,10 +11,13 @@ import static org.folio.entitlement.domain.model.ApplicationStageContext.PARAM_A
 import static org.folio.entitlement.domain.model.ApplicationStageContext.PARAM_APPLICATION_ID;
 import static org.folio.entitlement.domain.model.ApplicationStageContext.PARAM_ENTITLED_APPLICATION_DESCRIPTOR;
 import static org.folio.entitlement.domain.model.ApplicationStageContext.PARAM_ENTITLED_APPLICATION_ID;
+import static org.folio.entitlement.domain.model.IdentifiableStageContext.PARAM_FENCE_TOKEN;
+import static org.folio.entitlement.domain.model.IdentifiableStageContext.PARAM_ROOT_FLOW_ID;
 import static org.folio.entitlement.utils.EntitlementServiceUtils.toHashMap;
 import static org.folio.entitlement.utils.EntitlementServiceUtils.toUnmodifiableMap;
 import static org.folio.entitlement.utils.FlowUtils.combineStages;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -90,6 +93,8 @@ public class LayerFlowProvider {
     private final Map<EntitlementType, ApplicationFlowFactory> applicationFlowFactories;
 
     private final EntitlementRequest request;
+    private final UUID rootFlowId;
+    private final Long fenceToken;
     private final Map<String, UUID> applicationFlowMap;
     private final Sequence seqLayerFlowId;
     private final Map<String, ApplicationEntitlement> applicationEntitlementMap;
@@ -98,6 +103,8 @@ public class LayerFlowProvider {
     LayeredFlowsBuilder(CommonStageContext stageContext, List<ApplicationEntitlement> appEntitlements,
       Map<EntitlementType, ApplicationFlowFactory> applicationFlowFactories) {
       this.request = stageContext.getEntitlementRequest();
+      this.rootFlowId = stageContext.getRootFlowId();
+      this.fenceToken = stageContext.getFenceToken();
       this.seqLayerFlowId = Sequence.withPrefix(stageContext.flowId() + "/ApplicationsInstaller/Level");
 
       this.applicationFlowMap = MapUtils.emptyIfNull(stageContext.getQueuedApplicationFlows());
@@ -137,20 +144,33 @@ public class LayerFlowProvider {
 
       if (applicationEntitlement.type() == UPGRADE) {
         var entitledApplicationDescriptor = requireNonNull(entitledApplicationDescriptors.get(applicationName));
-        return Map.of(
-          PARAM_APPLICATION_ENTITLEMENT_TYPE, applicationEntitlement.type(),
-          PARAM_APPLICATION_ID, descriptor.getId(),
-          PARAM_APPLICATION_DESCRIPTOR, descriptor,
-          PARAM_ENTITLED_APPLICATION_DESCRIPTOR, entitledApplicationDescriptor,
-          PARAM_ENTITLED_APPLICATION_ID, entitledApplicationDescriptor.getId(),
-          PARAM_APPLICATION_FLOW_ID, applicationFlowId);
+        var parameters = new HashMap<String, Object>();
+        parameters.put(PARAM_APPLICATION_ENTITLEMENT_TYPE, applicationEntitlement.type());
+        parameters.put(PARAM_APPLICATION_ID, descriptor.getId());
+        parameters.put(PARAM_APPLICATION_DESCRIPTOR, descriptor);
+        parameters.put(PARAM_ENTITLED_APPLICATION_DESCRIPTOR, entitledApplicationDescriptor);
+        parameters.put(PARAM_ENTITLED_APPLICATION_ID, entitledApplicationDescriptor.getId());
+        parameters.put(PARAM_APPLICATION_FLOW_ID, applicationFlowId);
+        addFenceParameters(parameters);
+        return parameters;
       }
 
-      return Map.of(
-        PARAM_APPLICATION_ENTITLEMENT_TYPE, applicationEntitlement.type(),
-        PARAM_APPLICATION_ID, descriptor.getId(),
-        PARAM_APPLICATION_DESCRIPTOR, descriptor,
-        PARAM_APPLICATION_FLOW_ID, applicationFlowId);
+      var parameters = new HashMap<String, Object>();
+      parameters.put(PARAM_APPLICATION_ENTITLEMENT_TYPE, applicationEntitlement.type());
+      parameters.put(PARAM_APPLICATION_ID, descriptor.getId());
+      parameters.put(PARAM_APPLICATION_DESCRIPTOR, descriptor);
+      parameters.put(PARAM_APPLICATION_FLOW_ID, applicationFlowId);
+      addFenceParameters(parameters);
+      return parameters;
+    }
+
+    private void addFenceParameters(Map<String, Object> parameters) {
+      if (rootFlowId != null) {
+        parameters.put(PARAM_ROOT_FLOW_ID, rootFlowId);
+      }
+      if (fenceToken != null) {
+        parameters.put(PARAM_FENCE_TOKEN, fenceToken);
+      }
     }
 
     @SuppressWarnings("java:S1452")

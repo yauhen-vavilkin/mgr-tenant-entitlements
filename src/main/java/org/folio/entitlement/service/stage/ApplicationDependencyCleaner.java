@@ -13,6 +13,9 @@ public class ApplicationDependencyCleaner extends DatabaseLoggingStage<Applicati
 
   @Override
   public void execute(ApplicationStageContext context) {
+    if (!guardFenceToken(context)) {
+      return;
+    }
     applicationDependencyService.deleteEntitlementDependencies(
       context.getTenantId(),
       context.getApplicationId(),
@@ -21,6 +24,9 @@ public class ApplicationDependencyCleaner extends DatabaseLoggingStage<Applicati
 
   @Override
   public void cancel(ApplicationStageContext context) {
+    if (!guardFenceToken(context)) {
+      return;
+    }
     applicationDependencyService.saveEntitlementDependencies(
       context.getTenantId(),
       context.getApplicationId(),

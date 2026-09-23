@@ -16,6 +16,7 @@ import org.folio.entitlement.domain.entity.key.FlowStageKey;
 import org.folio.entitlement.domain.entity.type.EntityExecutionStatus;
 import org.folio.entitlement.domain.model.IdentifiableStageContext;
 import org.folio.entitlement.domain.model.RetryInformation;
+import org.folio.entitlement.repository.FlowRepository;
 import org.folio.entitlement.repository.FlowStageRepository;
 import org.folio.flow.api.Stage;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,11 +26,17 @@ import org.springframework.transaction.annotation.Transactional;
 public abstract class DatabaseLoggingStage<C extends IdentifiableStageContext> implements Stage<C> {
 
   protected FlowStageRepository stageRepository;
+  protected FlowRepository flowRepository;
   protected ThreadLocalModuleStageContext threadLocalModuleStageContext;
 
   @Override
   @Transactional
   public void onStart(C context) {
+    if (!guardFenceToken(context)) {
+      throw new IllegalStateException(String.format(
+        "Flow stage cannot start after ownership was reclaimed [flowId: %s, stageId: %s]",
+        context.getCurrentFlowId(), context.getStageId()));
+    }
     var entity = new FlowStageEntity();
     var stageId = UUID.randomUUID();
 
@@ -89,6 +96,28 @@ public abstract class DatabaseLoggingStage<C extends IdentifiableStageContext> i
   }
 
   @Autowired
+  public void setFlowRepository(FlowRepository flowRepository) {
+    this.flowRepository = flowRepository;
+  }
+
+  protected boolean isFenceTokenCurrent(C context) {
+    var fenceToken = context.getFenceToken();
+    return fenceToken == null || context.getRootFlowId() == null
+      || flowRepository.findById(context.getRootFlowId())
+      .map(flow -> fenceToken.equals(flow.getFenceToken())).orElse(false);
+  }
+
+  /**
+   * Checks and locks the root fence for the duration of the current transaction. This orders an owner side effect
+   * against reclamation: once recovery has advanced the token, this update affects no rows and the caller must stop.
+   */
+  protected boolean guardFenceToken(C context) {
+    var fenceToken = context.getFenceToken();
+    return fenceToken == null || context.getRootFlowId() == null
+      || flowRepository.guardFenceToken(context.getRootFlowId(), fenceToken) > 0;
+  }
+
+  @Autowired
   public void setThreadLocalModuleStageContext(ThreadLocalModuleStageContext threadLocalModuleStageContext) {
     this.threadLocalModuleStageContext = threadLocalModuleStageContext;
   }
@@ -114,6 +143,11 @@ public abstract class DatabaseLoggingStage<C extends IdentifiableStageContext> i
   }
 
   private void setEntitlementStageStatus(C context, EntityExecutionStatus status, Exception error) {
+    if (!guardFenceToken(context)) {
+      log.warn("Flow stage write skipped after ownership was reclaimed [flowId: {}, stageId: {}, "
+        + "observedFenceToken: {}]", context.getCurrentFlowId(), context.getStageId(), context.getFenceToken());
+      return;
+    }
     var stageExecutionKey = FlowStageKey.of(context.getCurrentFlowId(), getStageName(context));
     var stageExecutionEntity = stageRepository.getReferenceById(stageExecutionKey);
     stageExecutionEntity.setStatus(status);

@@ -31,6 +31,9 @@ public class EntitleApplicationFlowFinalizer
 
   @Override
   protected void afterFlowStatusUpdate(ApplicationStageContext context) {
+    if (context.getFenceToken() != null && !context.isFenceWriteSucceeded()) {
+      return;
+    }
     var entitlement = buildEntitlementFromContext(context);
     entitlementCrudService.save(entitlement);
   }
@@ -38,6 +41,9 @@ public class EntitleApplicationFlowFinalizer
   @Override
   @Transactional
   public void cancel(ApplicationStageContext context) {
+    if (context.getFenceToken() != null && !guardFenceToken(context)) {
+      return;
+    }
     var entitlement = buildEntitlementFromContext(context);
     entitlementCrudService.delete(entitlement);
   }

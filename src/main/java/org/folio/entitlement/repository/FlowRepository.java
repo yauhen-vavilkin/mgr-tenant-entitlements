@@ -41,6 +41,15 @@ public interface FlowRepository extends AbstractFlowRepository<FlowEntity> {
     @Param("currentStatuses") Collection<EntityExecutionStatus> currentStatuses,
     @Param("finishedAt") ZonedDateTime finishedAt, @Param("fenceToken") Long fenceToken);
 
+  /**
+   * Acquires the database row lock for an owner write without changing the fence token. The conditional update
+   * makes the result authoritative: a reclaimed owner gets zero rows and must not continue with child writes.
+   */
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query("UPDATE FlowEntity e SET e.fenceToken = e.fenceToken "
+    + "WHERE e.id = :flowId AND e.fenceToken = :fenceToken")
+  int guardFenceToken(@Param("flowId") UUID flowId, @Param("fenceToken") Long fenceToken);
+
   @Query("SELECT e.status FROM FlowEntity e WHERE e.id = :flowId")
   Optional<EntityExecutionStatus> findStatusById(@Param("flowId") UUID flowId);
 

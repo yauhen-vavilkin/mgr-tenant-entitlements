@@ -33,6 +33,9 @@ public abstract class AbstractModuleEventPublisher<T> extends ModuleDatabaseLogg
   @Override
   @SuppressWarnings("checkstyle:MethodLength")
   public void execute(ModuleStageContext ctx) {
+    if (!guardFenceToken(ctx)) {
+      return;
+    }
     var tenant = ctx.getTenantName();
     var type = ctx.getModuleType();
     var moduleDesc = ctx.getModuleDescriptor();

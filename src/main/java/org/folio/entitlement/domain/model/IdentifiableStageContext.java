@@ -8,6 +8,8 @@ public class IdentifiableStageContext extends AbstractStageContextWrapper {
 
   public static final String PARAM_STAGE_ID = "stageId";
   public static final String PARAM_FENCE_TOKEN = "fenceToken";
+  public static final String PARAM_ROOT_FLOW_ID = "rootFlowId";
+  public static final String PARAM_FENCE_WRITE_SUCCEEDED = "fenceWriteSucceeded";
 
   /**
    * Creates {@link IdentifiableStageContext} wrapper from {@link StageContext}.
@@ -36,12 +38,34 @@ public class IdentifiableStageContext extends AbstractStageContextWrapper {
   }
 
   public Long getFenceToken() {
-    return context.get(PARAM_FENCE_TOKEN);
+    Long token = context.get(PARAM_FENCE_TOKEN);
+    return token == null ? context.<Long>getFlowParameter(PARAM_FENCE_TOKEN) : token;
+  }
+
+  public UUID getRootFlowId() {
+    UUID rootFlowId = context.getFlowParameter(PARAM_ROOT_FLOW_ID);
+    if (rootFlowId != null) {
+      return rootFlowId;
+    }
+    try {
+      return UUID.fromString(context.flowId());
+    } catch (IllegalArgumentException exception) {
+      return null;
+    }
   }
 
   public IdentifiableStageContext withFenceToken(Long fenceToken) {
     context.put(PARAM_FENCE_TOKEN, fenceToken);
     return this;
+  }
+
+  public IdentifiableStageContext withFenceWriteSucceeded(boolean succeeded) {
+    context.put(PARAM_FENCE_WRITE_SUCCEEDED, succeeded);
+    return this;
+  }
+
+  public boolean isFenceWriteSucceeded() {
+    return Boolean.TRUE.equals(context.get(PARAM_FENCE_WRITE_SUCCEEDED));
   }
 
   public IdentifiableStageContext withStageId(UUID stageId) {

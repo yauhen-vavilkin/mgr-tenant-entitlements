@@ -4,6 +4,8 @@ import static org.apache.commons.lang3.StringUtils.capitalize;
 import static org.folio.common.utils.CollectionUtils.mapItems;
 import static org.folio.entitlement.domain.model.ApplicationStageContext.PARAM_APPLICATION_FLOW_ID;
 import static org.folio.entitlement.domain.model.ApplicationStageContext.PARAM_APPLICATION_ID;
+import static org.folio.entitlement.domain.model.IdentifiableStageContext.PARAM_FENCE_TOKEN;
+import static org.folio.entitlement.domain.model.IdentifiableStageContext.PARAM_ROOT_FLOW_ID;
 import static org.folio.entitlement.domain.model.ModuleStageContext.PARAM_INSTALLED_MODULE_DESCRIPTOR;
 import static org.folio.entitlement.domain.model.ModuleStageContext.PARAM_MODULE_DESCRIPTOR;
 import static org.folio.entitlement.domain.model.ModuleStageContext.PARAM_MODULE_DISCOVERY;
@@ -127,6 +129,7 @@ public class FolioModulesFlowProvider implements ModulesFlowProvider {
     flowParameters.put(PARAM_MODULE_TYPE, moduleType);
     flowParameters.put(PARAM_APPLICATION_ID, context.getApplicationId());
     flowParameters.put(PARAM_APPLICATION_FLOW_ID, context.getCurrentFlowId());
+    addFenceParameters(flowParameters, context);
 
     String moduleId = null;
     if (descriptor != null) {
@@ -146,5 +149,14 @@ public class FolioModulesFlowProvider implements ModulesFlowProvider {
     }
 
     return flowParameters;
+  }
+
+  private static void addFenceParameters(Map<String, Object> parameters, ApplicationStageContext context) {
+    if (context.getRootFlowId() != null) {
+      parameters.put(PARAM_ROOT_FLOW_ID, context.getRootFlowId());
+    }
+    if (context.getFenceToken() != null) {
+      parameters.put(PARAM_FENCE_TOKEN, context.getFenceToken());
+    }
   }
 }

@@ -64,23 +64,27 @@ public class FlowRecoveryService {
       return false;
     }
 
-    return interruptFlow(flowId, owner, parent.getFenceToken(), parent.getStatus());
+    return interruptFlow(flowId, owner, parent.getFenceToken());
   }
 
-  private boolean interruptFlow(UUID flowId, UUID owner, Long fenceToken, EntityExecutionStatus parentStatus) {
+  private boolean interruptFlow(UUID flowId, UUID owner, Long fenceToken) {
     var finishedAt = ZonedDateTime.now(ZoneId.systemDefault());
     var flowUpdated = fenceToken == null
       ? flowRepository.updateStatusIfCurrentIn(flowId, INTERRUPTED, NON_TERMINAL_STATUSES, finishedAt)
       : flowRepository.updateStatusIfCurrentInAndFenceToken(
         flowId, INTERRUPTED, NON_TERMINAL_STATUSES, finishedAt, fenceToken);
-    if (flowUpdated == 0 && fenceToken != null && NON_TERMINAL_STATUSES.contains(parentStatus)) {
+    if (flowUpdated == 0 && fenceToken != null) {
       log.info("Flow recovery lost the ownership fence race [flowId: {}, previousOwnerInstanceId: {}, "
           + "observedFenceToken: {}]", flowId, owner, fenceToken);
+      flowRepository.findById(flowId);
       return true;
     }
 
-    var applicationFlows = applicationFlowRepository.updateStatusByFlowIdIfCurrentIn(
-      flowId, INTERRUPTED, NON_TERMINAL_STATUSES, finishedAt);
+    var applicationFlows = fenceToken == null
+      ? applicationFlowRepository.updateStatusByFlowIdIfCurrentIn(
+        flowId, INTERRUPTED, NON_TERMINAL_STATUSES, finishedAt)
+      : applicationFlowRepository.updateStatusByFlowIdIfCurrentInAndFenceToken(
+        flowId, INTERRUPTED, NON_TERMINAL_STATUSES, finishedAt, fenceToken + 1);
     log.warn("Orphaned flow recovered [flowId: {}, previousOwnerInstanceId: {}, observedFenceToken: {}, "
         + "rootUpdated: {}, applicationFlows: {}, outcome: {}]",
       flowId, owner, fenceToken, flowUpdated, applicationFlows, INTERRUPTED);

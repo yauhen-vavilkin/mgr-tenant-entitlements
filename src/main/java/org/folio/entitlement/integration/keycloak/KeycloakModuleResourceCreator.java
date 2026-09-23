@@ -17,6 +17,9 @@ public class KeycloakModuleResourceCreator extends ModuleDatabaseLoggingStage {
 
   @Override
   public void execute(ModuleStageContext context) {
+    if (!guardFenceToken(context)) {
+      return;
+    }
     threadLocalModuleStageContext.set(context);
 
     var realm = context.getTenantName();
@@ -26,6 +29,9 @@ public class KeycloakModuleResourceCreator extends ModuleDatabaseLoggingStage {
 
   @Override
   public void cancel(ModuleStageContext context) {
+    if (!guardFenceToken(context)) {
+      return;
+    }
     var request = context.getEntitlementRequest();
     var moduleDescriptor = context.getModuleDescriptor();
     if (!request.isPurgeOnRollback()) {
