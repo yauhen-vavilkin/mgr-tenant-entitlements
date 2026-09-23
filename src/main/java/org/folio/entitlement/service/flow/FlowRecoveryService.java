@@ -33,13 +33,14 @@ public class FlowRecoveryService {
   public boolean recover(List<ApplicationFlow> applicationFlows) {
     try {
       var recoveredFlowIds = new HashSet<UUID>();
-      return applicationFlows.stream()
-        .filter(this::isBlocking)
-        .map(ApplicationFlow::getFlowId)
-        .filter(java.util.Objects::nonNull)
-        .filter(recoveredFlowIds::add)
-        .map(this::recoverFlow)
-        .anyMatch(Boolean.TRUE::equals);
+      var recoveryAttempted = false;
+      for (var applicationFlow : applicationFlows) {
+        if (isBlocking(applicationFlow) && applicationFlow.getFlowId() != null
+            && recoveredFlowIds.add(applicationFlow.getFlowId())) {
+          recoveryAttempted |= recoverFlow(applicationFlow.getFlowId());
+        }
+      }
+      return recoveryAttempted;
     } catch (RuntimeException e) {
       log.error("Failed to recover orphaned entitlement flow", e);
       throw new IllegalStateException("Failed to recover orphaned entitlement flow", e);
@@ -55,7 +56,7 @@ public class FlowRecoveryService {
 
     var parent = flow.get();
     var owner = parent.getOwnerInstanceId();
-    if (owner != null && heartbeatService.isAlive(owner)) {
+    if (NON_TERMINAL_STATUSES.contains(parent.getStatus()) && owner != null && heartbeatService.isAlive(owner)) {
       log.info("Flow recovery skipped because owner is alive [flowId: {}, ownerInstanceId: {}]", flowId, owner);
       return false;
     }
@@ -66,16 +67,16 @@ public class FlowRecoveryService {
   private boolean interruptFlow(UUID flowId, UUID owner) {
     var finishedAt = ZonedDateTime.now(ZoneId.systemDefault());
     var flowUpdated = flowRepository.updateStatusIfCurrentIn(flowId, INTERRUPTED, NON_TERMINAL_STATUSES, finishedAt);
-    if (flowUpdated == 0) {
-      log.info("Flow recovery skipped because flow is no longer blocking [flowId: {}, ownerInstanceId: {}]",
-        flowId, owner);
-      return false;
-    }
-
     var applicationFlows = applicationFlowRepository.updateStatusByFlowIdIfCurrentIn(
       flowId, INTERRUPTED, NON_TERMINAL_STATUSES, finishedAt);
-    log.warn("Orphaned flow recovered [flowId: {}, previousOwnerInstanceId: {}, applicationFlows: {}, outcome: {}]",
-      flowId, owner, applicationFlows, INTERRUPTED);
+    if (flowUpdated == 0 && applicationFlows == 0) {
+      log.info("Flow recovery found no blocking rows to interrupt [flowId: {}, previousOwnerInstanceId: {}]",
+        flowId, owner);
+    } else {
+      log.warn("Orphaned flow recovered [flowId: {}, previousOwnerInstanceId: {}, rootUpdated: {}, "
+          + "applicationFlows: {}, outcome: {}]",
+        flowId, owner, flowUpdated, applicationFlows, INTERRUPTED);
+    }
     return true;
   }
 
