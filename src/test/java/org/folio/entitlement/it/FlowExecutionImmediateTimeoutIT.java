@@ -22,10 +22,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.awaitility.Awaitility;
+import org.folio.entitlement.service.InstanceContext;
 import org.folio.entitlement.support.base.BaseIntegrationTest;
 import org.folio.test.extensions.WireMockStub;
 import org.folio.test.types.IntegrationTest;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.context.jdbc.SqlMergeMode;
@@ -49,6 +51,9 @@ import org.springframework.test.web.servlet.ResultActions;
 class FlowExecutionImmediateTimeoutIT extends BaseIntegrationTest {
 
   private static final String FOLIO_APP1_ID = "folio-app1-1.0.0";
+
+  @Autowired
+  private InstanceContext instanceContext;
 
   @Test
   @WireMockStub(scripts = {
@@ -75,7 +80,9 @@ class FlowExecutionImmediateTimeoutIT extends BaseIntegrationTest {
     var flowId = mvcResult.getResponse().getHeader(FLOW_ID_HEADER);
 
     // valid for both race outcomes: the poison-inserted FAILED row and the regular conditional update read the same
-    getFlow(flowId).andExpect(jsonPath("$.status", is("failed")));
+    getFlow(flowId)
+      .andExpect(jsonPath("$.status", is("failed")))
+      .andExpect(jsonPath("$.ownerInstanceId", is(instanceContext.getInstanceId().toString())));
 
     // the flow finalizer stage row is the background completion beacon: FailedFlowFinalizer when the flow refused to
     // start, FinishedFlowFinalizer when the initializer won the race and the flow ran through with skipped finalizers

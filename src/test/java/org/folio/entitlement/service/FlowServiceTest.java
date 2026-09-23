@@ -66,6 +66,7 @@ class FlowServiceTest {
   @Mock private FlowRepository flowRepository;
   @Mock private FlowStageService flowStageService;
   @Mock private ApplicationFlowService applicationFlowService;
+  @Mock private InstanceContext instanceContext;
 
   @AfterEach
   void tearDown() {
@@ -203,13 +204,15 @@ class FlowServiceTest {
     @Test
     void positive() {
       var flowEntity = flowEntity();
-      var request = EntitlementRequest.builder()
+      var instanceId = UUID.randomUUID();
+      final var request = EntitlementRequest.builder()
         .applications(List.of(APPLICATION_ID))
         .tenantId(TENANT_ID)
         .type(ENTITLE)
         .build();
       var flowCaptor = ArgumentCaptor.forClass(Flow.class);
 
+      when(instanceContext.getInstanceId()).thenReturn(instanceId);
       when(flowMapper.map(flowCaptor.capture())).thenReturn(flowEntity);
       when(flowRepository.saveAndFlush(flowEntity)).thenReturn(flowEntity);
 
@@ -220,6 +223,7 @@ class FlowServiceTest {
       assertThat(mappedFlow.getTenantId()).isEqualTo(TENANT_ID);
       assertThat(mappedFlow.getStatus()).isEqualTo(ExecutionStatus.FAILED);
       assertThat(mappedFlow.getType()).isEqualTo(ENTITLE);
+      assertThat(mappedFlow.getOwnerInstanceId()).isEqualTo(instanceId);
       assertThat(mappedFlow.getStartedAt()).isNull();
       assertThat(mappedFlow.getFinishedAt()).isNull();
     }
