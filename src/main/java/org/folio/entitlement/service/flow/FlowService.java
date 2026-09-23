@@ -129,7 +129,8 @@ public class FlowService {
       .tenantId(request.getTenantId())
       .status(ExecutionStatus.FAILED)
       .type(request.getType())
-      .ownerInstanceId(instanceContext.getInstanceId());
+      .ownerInstanceId(instanceContext.getInstanceId())
+      .fenceToken(0L);
 
     flowRepository.saveAndFlush(flowMapper.map(flow));
     log.warn("Flow timed out before it was started, created as failed [flowId: {}]", flowId);
@@ -192,8 +193,32 @@ public class FlowService {
       Set.of(IN_PROGRESS), finishedAt);
   }
 
+  public int finishFlowIfNoActiveStages(UUID flowId, ZonedDateTime finishedAt, Long fenceToken) {
+    return flowRepository.updateStatusByIdIfCurrentInAndNoStagesWithStatusAndFence(flowId, FINISHED,
+      Set.of(IN_PROGRESS), finishedAt, fenceToken);
+  }
+
   public int failActiveFlow(UUID id, ZonedDateTime finishedAt) {
     return flowRepository.updateStatusIfCurrentIn(id, FAILED, Set.of(IN_PROGRESS), finishedAt);
+  }
+
+  /**
+   * Reclaims a flow after its owner is presumed lost. The observed fence token is mandatory: a stale reclaim cannot
+   * replace a result written by another instance.
+   */
+  public boolean reclaim(UUID flowId, Long observedFenceToken) {
+    var updated = flowRepository.reclaimIfFenceMatches(flowId, instanceContext.getInstanceId(), observedFenceToken,
+      NON_TERMINAL_STATUSES, ZonedDateTime.now(ZoneId.systemDefault()));
+    if (updated == 0) {
+      log.warn("Flow reclaim lost the fence race [flowId: {}, observedFenceToken: {}]", flowId, observedFenceToken);
+      return false;
+    }
+    log.info("Flow ownership reclaimed [flowId: {}, fenceToken: {}]", flowId, observedFenceToken + 1);
+    return true;
+  }
+
+  public boolean reclaimFlow(UUID flowId, Long observedFenceToken) {
+    return reclaim(flowId, observedFenceToken);
   }
 
   @Transactional(readOnly = true)

@@ -11,4 +11,16 @@
     </addColumn>
   </changeSet>
 
+  <changeSet id="add-fence-token-to-flow" author="folio">
+    <addColumn tableName="flow">
+      <column name="fence_token" type="BIGINT" defaultValueNumeric="0">
+        <constraints nullable="false"/>
+      </column>
+    </addColumn>
+  </changeSet>
+
+  <changeSet id="add-interrupted-flow-status" author="folio">
+    <sql>ALTER TYPE entitlement_flow_status_type ADD VALUE 'INTERRUPTED' AFTER 'IN_PROGRESS';</sql>
+  </changeSet>
+
 </databaseChangeLog>

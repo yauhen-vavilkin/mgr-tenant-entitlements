@@ -18,6 +18,9 @@ public interface FlowRepository extends AbstractFlowRepository<FlowEntity> {
   @Query("SELECT e.status FROM FlowEntity e WHERE e.id = :flowId")
   Optional<EntityExecutionStatus> findStatusById(@Param("flowId") UUID flowId);
 
+  @Query("SELECT e.fenceToken FROM FlowEntity e WHERE e.id = :flowId")
+  Optional<Long> findFenceTokenById(@Param("flowId") UUID flowId);
+
   /**
    * Finds flows that have been waiting for asynchronous stage confirmations for longer than the given cutoff.
    *
@@ -46,11 +49,60 @@ public interface FlowRepository extends AbstractFlowRepository<FlowEntity> {
     @Param("excludedStageId") UUID excludedStageId);
 
   /**
-   * Completes a top-level flow that is waiting on asynchronous stage confirmations. See
-   * {@link ApplicationFlowRepository#updateStatusByIdIfCurrentInAndNoStagesWithStatus} for why the
-   * {@code awaitingAsyncSince IS NOT NULL} predicate is required rather than relying on the {@code NOT EXISTS}
-   * checks alone.
+   * Reclaims a flow using a compare-and-set fence. The token is incremented in the same statement as the ownership
+   * change, so concurrent reclaim attempts cannot both win.
    */
+  @Modifying
+  @Query("""
+    UPDATE FlowEntity f
+    SET f.status = org.folio.entitlement.domain.entity.type.EntityExecutionStatus.INTERRUPTED,
+        f.ownerInstanceId = :ownerInstanceId, f.fenceToken = f.fenceToken + 1,
+        f.finishedAt = :finishedAt
+    WHERE f.id = :flowId AND f.fenceToken = :observedFenceToken
+      AND f.status IN :currentStatuses""")
+  int reclaimIfFenceMatches(@Param("flowId") UUID flowId, @Param("ownerInstanceId") UUID ownerInstanceId,
+    @Param("observedFenceToken") Long observedFenceToken,
+    @Param("currentStatuses") Collection<EntityExecutionStatus> currentStatuses,
+    @Param("finishedAt") ZonedDateTime finishedAt);
+
+  /** Writes a root flow status only for the owner holding the observed fence token. */
+  @Modifying
+  @Query("""
+    UPDATE FlowEntity f
+    SET f.status = :status, f.finishedAt = :finishedAt, f.fenceToken = f.fenceToken + 1
+    WHERE f.id = :flowId AND f.fenceToken = :observedFenceToken AND f.status IN :currentStatuses""")
+  int updateStatusIfFenceMatches(@Param("flowId") UUID flowId, @Param("status") EntityExecutionStatus status,
+    @Param("currentStatuses") Collection<EntityExecutionStatus> currentStatuses,
+    @Param("finishedAt") ZonedDateTime finishedAt, @Param("observedFenceToken") Long observedFenceToken);
+
+  @Modifying
+  @Query("""
+    UPDATE FlowEntity f
+    SET f.status = :status, f.finishedAt = :finishedAt, f.fenceToken = f.fenceToken + 1
+    WHERE f.id = :flowId AND f.fenceToken = :observedFenceToken
+      AND f.status IN :currentStatuses AND f.awaitingAsyncSince IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM FlowStageEntity s
+        WHERE s.flowId = f.id AND s.status IN :currentStatuses)
+      AND NOT EXISTS (SELECT 1 FROM ApplicationFlowEntity af
+        WHERE af.flowId = f.id AND af.status IN :currentStatuses)""")
+  int updateStatusByIdIfCurrentInAndNoStagesWithStatusAndFence(@Param("flowId") UUID flowId,
+    @Param("status") EntityExecutionStatus status,
+    @Param("currentStatuses") Collection<EntityExecutionStatus> currentStatuses,
+    @Param("finishedAt") ZonedDateTime finishedAt,
+    @Param("observedFenceToken") Long observedFenceToken);
+
+  /** Records the async anchor only while the owner still holds the observed fence token. */
+  @Modifying
+  @Query("""
+    UPDATE FlowEntity f
+    SET f.awaitingAsyncSince = :awaitingAsyncSince, f.fenceToken = f.fenceToken + 1
+    WHERE f.id = :flowId AND f.fenceToken = :observedFenceToken
+      AND f.status = org.folio.entitlement.domain.entity.type.EntityExecutionStatus.IN_PROGRESS
+      AND f.awaitingAsyncSince IS NULL""")
+  int markAwaitingAsyncIfFenceMatches(@Param("flowId") UUID flowId,
+    @Param("awaitingAsyncSince") ZonedDateTime awaitingAsyncSince,
+    @Param("observedFenceToken") Long observedFenceToken);
+
   @Modifying
   @Query("""
     UPDATE FlowEntity f

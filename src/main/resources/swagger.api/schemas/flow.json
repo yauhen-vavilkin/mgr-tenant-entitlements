@@ -28,6 +28,11 @@
       "type": "string",
       "format": "uuid"
     },
+    "fenceToken": {
+      "description": "Monotonically increasing token that fences stale flow owners",
+      "type": "integer",
+      "format": "int64"
+    },
     "startedAt": {
       "description": "A control flow start timestamp",
       "type": "string",

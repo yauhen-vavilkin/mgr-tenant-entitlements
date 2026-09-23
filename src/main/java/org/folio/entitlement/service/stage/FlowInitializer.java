@@ -28,6 +28,8 @@ public class FlowInitializer extends DatabaseLoggingStage<CommonStageContext> {
       .ownerInstanceId(instanceContext.getInstanceId())
       .startedAt(Date.from(Instant.now()));
 
+    flow.fenceToken(0L);
     flowService.create(flow);
+    context.put(CommonStageContext.PARAM_FENCE_TOKEN, 0L);
   }
 }

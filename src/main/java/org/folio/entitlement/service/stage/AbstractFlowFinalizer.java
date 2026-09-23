@@ -13,8 +13,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.folio.entitlement.domain.entity.AbstractFlowEntity;
 import org.folio.entitlement.domain.entity.type.EntityExecutionStatus;
+import org.folio.entitlement.domain.model.CommonStageContext;
 import org.folio.entitlement.domain.model.IdentifiableStageContext;
 import org.folio.entitlement.repository.AbstractFlowRepository;
+import org.folio.entitlement.repository.FlowRepository;
 import org.folio.entitlement.service.flow.FlowCompletionService;
 import org.folio.entitlement.utils.TransactionHelper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +35,7 @@ public abstract class AbstractFlowFinalizer<T extends AbstractFlowEntity, C exte
 
   private final AbstractFlowRepository<T> abstractFlowRepository;
   private final FlowFinalizerStatusProvider<C> statusProvider;
+  private FlowRepository rootFlowRepository;
 
   /**
    * Sets the final flow status with a single compare-and-set statement and runs {@link #afterFlowStatusUpdate(C)}
@@ -56,21 +59,22 @@ public abstract class AbstractFlowFinalizer<T extends AbstractFlowEntity, C exte
     var status = EntityExecutionStatus.from(statusProvider.getFinalStatus(context));
 
     if (status == IN_PROGRESS) {
-      var anchored = abstractFlowRepository.markAwaitingAsync(
-        entitlementFlowId, ZonedDateTime.now(ZoneId.systemDefault()));
+      var anchored = markAwaitingAsync(context, entitlementFlowId);
 
       if (anchored > 0) {
+        advanceFenceToken(context);
+
         log.info("Flow is waiting for async stage confirmations [flowId: {}]", entitlementFlowId);
       }
     } else {
-      var updated = abstractFlowRepository.updateStatusIfCurrentIn(
-        entitlementFlowId, status, allowedCurrentStatuses(status), ZonedDateTime.now(ZoneId.systemDefault()));
+      var updated = updateStatus(context, entitlementFlowId, status, ZonedDateTime.now(ZoneId.systemDefault()));
 
       if (updated == 0) {
         log.warn("Flow status update to {} is skipped, flow is already in a terminal status [flowId: {}]",
           status, entitlementFlowId);
         return;
       }
+      advanceFenceToken(context);
     }
 
     // Called for both terminal and IN_PROGRESS: application finalizers must persist entitlement/revoke/upgrade
@@ -104,6 +108,11 @@ public abstract class AbstractFlowFinalizer<T extends AbstractFlowEntity, C exte
   }
 
   @Autowired
+  public void setRootFlowRepository(FlowRepository rootFlowRepository) {
+    this.rootFlowRepository = rootFlowRepository;
+  }
+
+  @Autowired
   public void setFlowCompletionService(FlowCompletionService flowCompletionService) {
     this.flowCompletionService = flowCompletionService;
   }
@@ -114,6 +123,36 @@ public abstract class AbstractFlowFinalizer<T extends AbstractFlowEntity, C exte
   }
 
   protected void afterFlowStatusUpdate(C context) {}
+
+  private void advanceFenceToken(C context) {
+    if (isRootFlow(context) && context.get(CommonStageContext.PARAM_FENCE_TOKEN) != null) {
+      var token = context.<Long>get(CommonStageContext.PARAM_FENCE_TOKEN);
+      context.put(CommonStageContext.PARAM_FENCE_TOKEN, token + 1);
+    }
+  }
+
+  private boolean isRootFlow(C context) {
+    return context instanceof CommonStageContext;
+  }
+
+  private int markAwaitingAsync(C context, java.util.UUID flowId) {
+    if (!isRootFlow(context) || rootFlowRepository == null
+        || context.get(CommonStageContext.PARAM_FENCE_TOKEN) == null) {
+      return abstractFlowRepository.markAwaitingAsync(flowId, ZonedDateTime.now(ZoneId.systemDefault()));
+    }
+    return rootFlowRepository.markAwaitingAsyncIfFenceMatches(flowId,
+      ZonedDateTime.now(ZoneId.systemDefault()), context.get(CommonStageContext.PARAM_FENCE_TOKEN));
+  }
+
+  private int updateStatus(C context, java.util.UUID flowId, EntityExecutionStatus status, ZonedDateTime finishedAt) {
+    if (!isRootFlow(context) || rootFlowRepository == null
+        || context.get(CommonStageContext.PARAM_FENCE_TOKEN) == null) {
+      return abstractFlowRepository.updateStatusIfCurrentIn(flowId, status,
+        allowedCurrentStatuses(status), finishedAt);
+    }
+    return rootFlowRepository.updateStatusIfFenceMatches(flowId, status, allowedCurrentStatuses(status), finishedAt,
+      context.get(CommonStageContext.PARAM_FENCE_TOKEN));
+  }
 
   /**
    * Cancellation must be able to roll back a FINISHED flow and to supersede a timeout-forced FAILED status;

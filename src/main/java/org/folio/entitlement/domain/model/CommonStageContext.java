@@ -14,6 +14,7 @@ import org.folio.flow.api.StageContext;
 public class CommonStageContext extends IdentifiableStageContext {
 
   public static final String PARAM_REQUEST = "entitlementRequest";
+  public static final String PARAM_FENCE_TOKEN = "fenceToken";
   public static final String PARAM_APP_DESCRIPTORS = "applicationDescriptors";
   public static final String PARAM_QUEUED_APP_FLOWS = "queuedApplicationFlows";
   public static final String PARAM_ENTITLED_APP_IDS = "entitledApplicationIds";
