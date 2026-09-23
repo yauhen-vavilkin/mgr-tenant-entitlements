@@ -56,15 +56,13 @@ public abstract class AbstractFlowFinalizer<T extends AbstractFlowEntity, C exte
     var status = EntityExecutionStatus.from(statusProvider.getFinalStatus(context));
 
     if (status == IN_PROGRESS) {
-      var anchored = abstractFlowRepository.markAwaitingAsync(
-        entitlementFlowId, ZonedDateTime.now(ZoneId.systemDefault()));
+      var anchored = markAwaitingAsync(context, entitlementFlowId);
 
       if (anchored > 0) {
         log.info("Flow is waiting for async stage confirmations [flowId: {}]", entitlementFlowId);
       }
     } else {
-      var updated = abstractFlowRepository.updateStatusIfCurrentIn(
-        entitlementFlowId, status, allowedCurrentStatuses(status), ZonedDateTime.now(ZoneId.systemDefault()));
+      var updated = updateStatus(context, entitlementFlowId, status);
 
       if (updated == 0) {
         log.warn("Flow status update to {} is skipped, flow is already in a terminal status [flowId: {}]",
@@ -114,6 +112,27 @@ public abstract class AbstractFlowFinalizer<T extends AbstractFlowEntity, C exte
   }
 
   protected void afterFlowStatusUpdate(C context) {}
+
+  private int markAwaitingAsync(C context, java.util.UUID flowId) {
+    var fenceToken = context.getFenceToken();
+    if (fenceToken != null
+        && abstractFlowRepository instanceof org.folio.entitlement.repository.FlowRepository flowRepository) {
+      return flowRepository.markAwaitingAsyncWithFenceToken(
+        flowId, ZonedDateTime.now(ZoneId.systemDefault()), fenceToken);
+    }
+    return abstractFlowRepository.markAwaitingAsync(flowId, ZonedDateTime.now(ZoneId.systemDefault()));
+  }
+
+  private int updateStatus(C context, java.util.UUID flowId, EntityExecutionStatus status) {
+    var fenceToken = context.getFenceToken();
+    if (fenceToken != null
+        && abstractFlowRepository instanceof org.folio.entitlement.repository.FlowRepository flowRepository) {
+      return flowRepository.updateStatusIfCurrentInAndFenceToken(flowId, status, allowedCurrentStatuses(status),
+        ZonedDateTime.now(ZoneId.systemDefault()), fenceToken);
+    }
+    return abstractFlowRepository.updateStatusIfCurrentIn(
+      flowId, status, allowedCurrentStatuses(status), ZonedDateTime.now(ZoneId.systemDefault()));
+  }
 
   /**
    * Cancellation must be able to roll back a FINISHED flow and to supersede a timeout-forced FAILED status;

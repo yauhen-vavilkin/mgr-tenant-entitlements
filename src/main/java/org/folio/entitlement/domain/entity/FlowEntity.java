@@ -33,6 +33,12 @@ public class FlowEntity extends AbstractFlowEntity {
   private UUID ownerInstanceId;
 
   /**
+   * Monotonic fence token used to reject writes from an owner that has lost the flow.
+   */
+  @Column(name = "fence_token", nullable = false)
+  private Long fenceToken;
+
+  /**
    * An entitlement request type for tenant.
    */
   @Enumerated(EnumType.STRING)

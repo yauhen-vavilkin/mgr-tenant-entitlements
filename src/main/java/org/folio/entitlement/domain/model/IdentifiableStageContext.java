@@ -7,6 +7,7 @@ import org.folio.flow.api.StageContext;
 public class IdentifiableStageContext extends AbstractStageContextWrapper {
 
   public static final String PARAM_STAGE_ID = "stageId";
+  public static final String PARAM_FENCE_TOKEN = "fenceToken";
 
   /**
    * Creates {@link IdentifiableStageContext} wrapper from {@link StageContext}.
@@ -32,6 +33,15 @@ public class IdentifiableStageContext extends AbstractStageContextWrapper {
 
   public UUID getStageId() {
     return context.get(PARAM_STAGE_ID);
+  }
+
+  public Long getFenceToken() {
+    return context.get(PARAM_FENCE_TOKEN);
+  }
+
+  public IdentifiableStageContext withFenceToken(Long fenceToken) {
+    context.put(PARAM_FENCE_TOKEN, fenceToken);
+    return this;
   }
 
   public IdentifiableStageContext withStageId(UUID stageId) {

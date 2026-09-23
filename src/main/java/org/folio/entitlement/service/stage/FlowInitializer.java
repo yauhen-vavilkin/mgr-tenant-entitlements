@@ -29,5 +29,6 @@ public class FlowInitializer extends DatabaseLoggingStage<CommonStageContext> {
       .startedAt(Date.from(Instant.now()));
 
     flowService.create(flow);
+    context.withFenceToken(0L);
   }
 }

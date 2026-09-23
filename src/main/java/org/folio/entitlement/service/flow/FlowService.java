@@ -111,6 +111,7 @@ public class FlowService {
     }
 
     var flowEntity = flowMapper.map(flow);
+    flowEntity.setFenceToken(0L);
     var savedEntity = flowRepository.save(flowEntity);
     return flowMapper.map(savedEntity);
   }
@@ -131,7 +132,9 @@ public class FlowService {
       .type(request.getType())
       .ownerInstanceId(instanceContext.getInstanceId());
 
-    flowRepository.saveAndFlush(flowMapper.map(flow));
+    var flowEntity = flowMapper.map(flow);
+    flowEntity.setFenceToken(0L);
+    flowRepository.saveAndFlush(flowEntity);
     log.warn("Flow timed out before it was started, created as failed [flowId: {}]", flowId);
   }
 
