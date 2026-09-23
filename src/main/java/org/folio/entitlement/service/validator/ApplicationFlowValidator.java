@@ -14,6 +14,7 @@ import org.folio.entitlement.domain.model.CommonStageContext;
 import org.folio.entitlement.domain.model.EntitlementRequest;
 import org.folio.entitlement.exception.RequestValidationException;
 import org.folio.entitlement.service.flow.ApplicationFlowService;
+import org.folio.entitlement.service.flow.FlowRecoveryService;
 import org.folio.entitlement.service.stage.DatabaseLoggingStage;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -25,6 +26,7 @@ public class ApplicationFlowValidator extends DatabaseLoggingStage<CommonStageCo
   implements EntitlementRequestValidator {
 
   private final ApplicationFlowService applicationFlowService;
+  private final FlowRecoveryService flowRecoveryService;
   private final DesiredStateValidationService desiredStateValidationService;
 
   @Override
@@ -58,6 +60,12 @@ public class ApplicationFlowValidator extends DatabaseLoggingStage<CommonStageCo
     var applicationFlows = entitlementType == REVOKE
       ? applicationFlowService.findLastFlows(applicationIds, request.getTenantId())
       : applicationFlowService.findLastFlowsByNames(getNames(applicationIds), request.getTenantId());
+
+    if (flowRecoveryService.recover(applicationFlows)) {
+      applicationFlows = entitlementType == REVOKE
+        ? applicationFlowService.findLastFlows(applicationIds, request.getTenantId())
+        : applicationFlowService.findLastFlowsByNames(getNames(applicationIds), request.getTenantId());
+    }
 
     var validationErrors = applicationFlows.stream()
       .map(applicationFlow -> validateApplicationFlow(applicationFlow, entitlementType))

@@ -75,7 +75,7 @@ public interface ApplicationFlowRepository extends AbstractFlowRepository<Applic
    * statement, so a status set concurrently by a finalizer stage cannot be overwritten. {@code finishedAt} is passed
    * in because a bulk update bypasses {@link org.hibernate.annotations.UpdateTimestamp}.
    */
-  @Modifying
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query("UPDATE ApplicationFlowEntity e SET e.status = :status, e.finishedAt = :finishedAt "
     + "WHERE e.flowId = :flowId AND e.status IN :currentStatuses")
   int updateStatusByFlowIdIfCurrentIn(@Param("flowId") UUID flowId,

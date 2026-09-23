@@ -36,6 +36,7 @@ import org.folio.entitlement.domain.dto.ExecutionStatus;
 import org.folio.entitlement.domain.model.EntitlementRequest;
 import org.folio.entitlement.exception.RequestValidationException;
 import org.folio.entitlement.service.flow.ApplicationFlowService;
+import org.folio.entitlement.service.flow.FlowRecoveryService;
 import org.folio.test.types.UnitTest;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.DisplayName;
@@ -55,6 +56,7 @@ class ApplicationFlowValidatorTest {
 
   @InjectMocks private ApplicationFlowValidator validator;
   @Mock private ApplicationFlowService applicationFlowService;
+  @Mock private FlowRecoveryService flowRecoveryService;
   @Mock private DesiredStateValidationService desiredStateValidationService;
 
   @DisplayName("validate_positive_entitleRequest")

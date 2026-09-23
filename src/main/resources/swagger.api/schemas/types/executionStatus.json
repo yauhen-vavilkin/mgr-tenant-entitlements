@@ -9,6 +9,7 @@
     "in_progress",
     "cancelled",
     "cancellation_failed",
+    "interrupted",
     "failed",
     "finished"
   ]

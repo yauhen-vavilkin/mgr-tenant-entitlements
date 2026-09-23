@@ -21,7 +21,7 @@ public interface AbstractFlowRepository<T extends AbstractFlowEntity> extends Jp
    * another writer cannot be overwritten. {@code finishedAt} is passed in because a bulk update bypasses
    * {@link org.hibernate.annotations.UpdateTimestamp}.
    */
-  @Modifying
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query("UPDATE #{#entityName} e SET e.status = :status, e.finishedAt = :finishedAt "
     + "WHERE e.id = :id AND e.status IN :currentStatuses")
   int updateStatusIfCurrentIn(@Param("id") UUID id,
