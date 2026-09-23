@@ -23,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 @Log4j2
+@Transactional
 public abstract class DatabaseLoggingStage<C extends IdentifiableStageContext> implements Stage<C> {
 
   protected FlowStageRepository stageRepository;
@@ -32,7 +33,7 @@ public abstract class DatabaseLoggingStage<C extends IdentifiableStageContext> i
   @Override
   @Transactional
   public void onStart(C context) {
-    if (!guardFenceToken(context)) {
+    if (!guardFenceToken(context) && !isTimedOutRootFinalizer(context)) {
       throw new IllegalStateException(String.format(
         "Flow stage cannot start after ownership was reclaimed [flowId: %s, stageId: %s]",
         context.getCurrentFlowId(), context.getStageId()));
@@ -117,6 +118,22 @@ public abstract class DatabaseLoggingStage<C extends IdentifiableStageContext> i
       || flowRepository.guardFenceToken(context.getRootFlowId(), fenceToken) > 0;
   }
 
+  /**
+   * A timeout is an external terminal write: the flow engine cannot abort the active run, so its root finalizer still
+   * needs to record completion. The finalizer's execution remains fenced and skips business side effects; only its
+   * root stage bookkeeping may finish. A recovered flow is INTERRUPTED and remains fenced out here.
+   */
+  private boolean isTimedOutRootFinalizer(C context) {
+    var rootFlowId = context.getRootFlowId();
+    if (!(this instanceof AbstractFlowFinalizer<?, ?>)
+        || rootFlowId == null || !rootFlowId.equals(context.getCurrentFlowId())) {
+      return false;
+    }
+    return flowRepository.findById(rootFlowId)
+      .map(flow -> flow.getStatus() == FAILED)
+      .orElse(false);
+  }
+
   @Autowired
   public void setThreadLocalModuleStageContext(ThreadLocalModuleStageContext threadLocalModuleStageContext) {
     this.threadLocalModuleStageContext = threadLocalModuleStageContext;
@@ -143,7 +160,7 @@ public abstract class DatabaseLoggingStage<C extends IdentifiableStageContext> i
   }
 
   private void setEntitlementStageStatus(C context, EntityExecutionStatus status, Exception error) {
-    if (!guardFenceToken(context)) {
+    if (!guardFenceToken(context) && !isTimedOutRootFinalizer(context)) {
       log.warn("Flow stage write skipped after ownership was reclaimed [flowId: {}, stageId: {}, "
         + "observedFenceToken: {}]", context.getCurrentFlowId(), context.getStageId(), context.getFenceToken());
       return;
