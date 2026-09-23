@@ -4,8 +4,11 @@ import static java.util.Collections.emptyMap;
 import static org.folio.entitlement.domain.dto.EntitlementRequestType.ENTITLE;
 import static org.folio.entitlement.domain.entity.type.EntityExecutionStatus.FINISHED;
 import static org.folio.entitlement.domain.entity.type.EntityExecutionStatus.NON_TERMINAL_STATUSES;
+import static org.folio.entitlement.domain.model.IdentifiableStageContext.PARAM_FENCE_TOKEN;
+import static org.folio.entitlement.domain.model.IdentifiableStageContext.PARAM_ROOT_FLOW_ID;
 import static org.folio.entitlement.support.TestConstants.APPLICATION_FLOW_ID;
 import static org.folio.entitlement.support.TestConstants.APPLICATION_ID;
+import static org.folio.entitlement.support.TestConstants.FLOW_ID;
 import static org.folio.entitlement.support.TestConstants.FLOW_STAGE_ID;
 import static org.folio.entitlement.support.TestConstants.TENANT_ID;
 import static org.folio.entitlement.support.TestValues.appStageContext;
@@ -24,6 +27,7 @@ import org.folio.entitlement.domain.entity.key.FlowStageKey;
 import org.folio.entitlement.domain.model.ApplicationStageContext;
 import org.folio.entitlement.domain.model.EntitlementRequest;
 import org.folio.entitlement.repository.ApplicationFlowRepository;
+import org.folio.entitlement.repository.FlowRepository;
 import org.folio.entitlement.repository.FlowStageRepository;
 import org.folio.entitlement.service.EntitlementCrudService;
 import org.folio.entitlement.service.flow.FlowCompletionService;
@@ -48,6 +52,7 @@ class EntitleApplicationFlowFinalizerTest {
   @Mock private FlowFinalizerStatusProvider<ApplicationStageContext> statusProvider;
   @Mock private EntitlementCrudService entitlementCrudService;
   @Mock private ApplicationFlowRepository applicationFlowRepository;
+  @Mock private FlowRepository flowRepository;
   @Mock private FlowStageRepository stageRepository;
   @Mock private ThreadLocalModuleStageContext threadLocalModuleStageContext;
   @Mock private TransactionHelper transactionHelper;
@@ -56,8 +61,10 @@ class EntitleApplicationFlowFinalizerTest {
   @BeforeEach
   void setUp() {
     flowFinalizer.setStageRepository(stageRepository);
+    flowFinalizer.setFlowRepository(flowRepository);
     flowFinalizer.setThreadLocalModuleStageContext(threadLocalModuleStageContext);
     flowFinalizer.setFlowCompletionService(flowCompletionService);
+    flowFinalizer.setRootFlowRepository(flowRepository);
     flowFinalizer.setTransactionHelper(transactionHelper);
   }
 
@@ -112,6 +119,58 @@ class EntitleApplicationFlowFinalizerTest {
   }
 
   @Test
+  void execute_staleOwnerDoesNotSaveEntitlement() {
+    when(flowRepository.guardFenceToken(FLOW_ID, 2L)).thenReturn(0);
+
+    flowFinalizer.execute(fencedStageContext(2L));
+
+    verify(applicationFlowRepository, never()).updateStatusIfCurrentInAndFenceToken(
+      any(), any(), any(), any(), any());
+    verify(entitlementCrudService, never()).save(any());
+  }
+
+  @Test
+  void execute_zeroRowFencedStatusWriteDoesNotSaveEntitlement() {
+    when(flowRepository.guardFenceToken(FLOW_ID, 2L)).thenReturn(1);
+    when(statusProvider.getFinalStatus(any())).thenReturn(ExecutionStatus.FINISHED);
+    when(applicationFlowRepository.updateStatusIfCurrentInAndFenceToken(
+      eq(APPLICATION_FLOW_ID), eq(FINISHED), eq(NON_TERMINAL_STATUSES), any(ZonedDateTime.class), eq(2L)))
+      .thenReturn(0);
+
+    flowFinalizer.execute(fencedStageContext(2L));
+
+    verify(applicationFlowRepository).updateStatusIfCurrentInAndFenceToken(
+      eq(APPLICATION_FLOW_ID), eq(FINISHED), eq(NON_TERMINAL_STATUSES), any(ZonedDateTime.class), eq(2L));
+    verify(entitlementCrudService, never()).save(any());
+  }
+
+  @Test
+  void execute_zeroRowFencedAsyncAnchorWriteDoesNotSaveEntitlement() {
+    when(flowRepository.guardFenceToken(FLOW_ID, 2L)).thenReturn(1);
+    when(applicationFlowRepository.markAwaitingAsyncWithFenceToken(
+      eq(APPLICATION_FLOW_ID), any(ZonedDateTime.class), eq(2L))).thenReturn(0);
+    var currentRoot = new org.folio.entitlement.domain.entity.FlowEntity();
+    currentRoot.setFenceToken(3L);
+    when(flowRepository.findById(FLOW_ID)).thenReturn(java.util.Optional.of(currentRoot));
+    when(statusProvider.getFinalStatus(any())).thenReturn(ExecutionStatus.IN_PROGRESS);
+
+    flowFinalizer.execute(fencedStageContext(2L));
+
+    verify(applicationFlowRepository).markAwaitingAsyncWithFenceToken(
+      eq(APPLICATION_FLOW_ID), any(ZonedDateTime.class), eq(2L));
+    verify(entitlementCrudService, never()).save(any());
+  }
+
+  @Test
+  void cancel_staleOwnerDoesNotDeleteEntitlement() {
+    when(flowRepository.guardFenceToken(FLOW_ID, 2L)).thenReturn(0);
+
+    flowFinalizer.cancel(fencedStageContext(2L));
+
+    verify(entitlementCrudService, never()).delete(any());
+  }
+
+  @Test
   void onSuccess_positive() {
     var expectedKey = FlowStageKey.of(APPLICATION_FLOW_ID, "EntitleApplicationFlowFinalizer");
     var entity = new FlowStageEntity();
@@ -137,5 +196,14 @@ class EntitleApplicationFlowFinalizerTest {
     var stageContext = appStageContext(FLOW_STAGE_ID, flowParameters, emptyMap());
     flowFinalizer.cancel(stageContext);
     verify(entitlementCrudService).delete(entitlement(TENANT_ID, APPLICATION_ID));
+  }
+
+  private static ApplicationStageContext fencedStageContext(long token) {
+    var request = EntitlementRequest.builder().type(ENTITLE).tenantId(TENANT_ID).build();
+    var parameters = new java.util.HashMap<String, Object>();
+    parameters.putAll((java.util.Map) flowParameters(request, TestValues.appDescriptor()));
+    parameters.put(PARAM_ROOT_FLOW_ID, FLOW_ID);
+    parameters.put(PARAM_FENCE_TOKEN, token);
+    return appStageContext(FLOW_STAGE_ID, parameters, emptyMap());
   }
 }

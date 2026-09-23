@@ -76,6 +76,8 @@ public class FlowRecoveryService {
     if (flowUpdated == 0 && fenceToken != null) {
       log.info("Flow recovery lost the ownership fence race [flowId: {}, previousOwnerInstanceId: {}, "
           + "observedFenceToken: {}]", flowId, owner, fenceToken);
+      // The root CAS is the ownership decision.  A losing worker must not use the token it observed before the
+      // race to touch child rows; the validator will reload them after this method returns.
       flowRepository.findById(flowId);
       return true;
     }
