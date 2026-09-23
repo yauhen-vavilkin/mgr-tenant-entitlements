@@ -50,8 +50,11 @@ public class FlowRecoveryService {
   private boolean recoverFlow(UUID flowId) {
     var flow = flowRepository.findById(flowId);
     if (flow.isEmpty()) {
-      log.warn("Unable to recover application flow because parent flow was not found [flowId: {}]", flowId);
-      return false;
+      var applicationFlows = applicationFlowRepository.updateStatusByFlowIdIfCurrentIn(
+        flowId, INTERRUPTED, NON_TERMINAL_STATUSES, ZonedDateTime.now(ZoneId.systemDefault()));
+      log.warn("Recovered orphaned application-flow rows because parent flow was not found [flowId: {}, "
+          + "applicationFlows: {}, outcome: {}]", flowId, applicationFlows, INTERRUPTED);
+      return true;
     }
 
     var parent = flow.get();

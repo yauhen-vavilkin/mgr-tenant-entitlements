@@ -77,6 +77,20 @@ class FlowRecoveryServiceTest {
   }
 
   @Test
+  void recover_interruptsOrphanedChildWhenParentIsMissing() {
+    var service = service();
+    when(flowRepository.findById(FLOW_ID)).thenReturn(Optional.empty());
+    when(applicationFlowRepository.updateStatusByFlowIdIfCurrentIn(
+      eq(FLOW_ID), eq(INTERRUPTED), any(), any())).thenReturn(1);
+
+    var result = service.recover(List.of(applicationFlow(QUEUED, FLOW_ID)));
+
+    assertThat(result).isTrue();
+    verify(applicationFlowRepository).updateStatusByFlowIdIfCurrentIn(eq(FLOW_ID), eq(INTERRUPTED), any(), any());
+    verify(flowRepository, never()).updateStatusIfCurrentIn(any(), any(), any(), any());
+  }
+
+  @Test
   void recover_interruptsOrphanedChildWhenParentIsTerminal() {
     var service = service();
     when(flowRepository.findById(FLOW_ID)).thenReturn(Optional.of(parent(FAILED, OWNER_ID)));
