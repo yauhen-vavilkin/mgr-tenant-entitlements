@@ -27,6 +27,12 @@ public class FlowEntity extends AbstractFlowEntity {
   private UUID tenantId;
 
   /**
+   * Identifier of the MTE process that owns this flow. Null for flows created before ownership was introduced.
+   */
+  @Column(name = "owner_instance_id")
+  private UUID ownerInstanceId;
+
+  /**
    * An entitlement request type for tenant.
    */
   @Enumerated(EnumType.STRING)
