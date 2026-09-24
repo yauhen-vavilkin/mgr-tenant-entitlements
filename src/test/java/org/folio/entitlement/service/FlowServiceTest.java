@@ -21,6 +21,7 @@ import jakarta.persistence.EntityNotFoundException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.EnumSet;
 import java.util.List;
@@ -108,7 +109,7 @@ class FlowServiceTest {
 
     @Test
     void positive_includeStagesIsFalse() {
-      var finishedAt = ZonedDateTime.ofInstant(Instant.now(), ZoneId.of("UTC"));
+      var finishedAt = ZonedDateTime.ofInstant(Instant.now().truncatedTo(ChronoUnit.MILLIS), ZoneId.of("UTC"));
       var startedAt = finishedAt.minusSeconds(1);
       var flow = flow(FINISHED, Date.from(startedAt.toInstant()), Date.from(finishedAt.toInstant()));
       var flowEntity = flowEntity(startedAt, finishedAt);
@@ -131,7 +132,7 @@ class FlowServiceTest {
 
     @Test
     void positive_includeStagesIsTrue() {
-      var finishedAt = ZonedDateTime.ofInstant(Instant.now(), ZoneId.of("UTC"));
+      var finishedAt = ZonedDateTime.ofInstant(Instant.now().truncatedTo(ChronoUnit.MILLIS), ZoneId.of("UTC"));
       var startedAt = finishedAt.minusSeconds(1);
       var flow = flow(FINISHED, Date.from(startedAt.toInstant()), Date.from(finishedAt.toInstant()));
       var flowEntity = flowEntity(startedAt, finishedAt);

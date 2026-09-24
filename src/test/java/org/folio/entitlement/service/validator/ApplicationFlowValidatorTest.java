@@ -36,6 +36,7 @@ import org.folio.entitlement.domain.dto.ExecutionStatus;
 import org.folio.entitlement.domain.model.EntitlementRequest;
 import org.folio.entitlement.exception.RequestValidationException;
 import org.folio.entitlement.service.flow.ApplicationFlowService;
+import org.folio.entitlement.service.flow.FlowRecoveryService;
 import org.folio.test.types.UnitTest;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.DisplayName;
@@ -55,6 +56,7 @@ class ApplicationFlowValidatorTest {
 
   @InjectMocks private ApplicationFlowValidator validator;
   @Mock private ApplicationFlowService applicationFlowService;
+  @Mock private FlowRecoveryService flowRecoveryService;
   @Mock private DesiredStateValidationService desiredStateValidationService;
 
   @DisplayName("validate_positive_entitleRequest")
@@ -83,6 +85,21 @@ class ApplicationFlowValidatorTest {
     validator.validate(request);
 
     verify(applicationFlowService).findLastFlows(applicationId, tenantId);
+  }
+
+  @Test
+  void validate_reloadsApplicationFlowsAfterRecoveryForNonStateRequest() {
+    var request = request(ENTITLE);
+    var blockingFlows = List.of(flow(EntitlementType.ENTITLE, QUEUED));
+    when(applicationFlowService.findLastFlowsByNames(getApplicationNames(request), TENANT_ID))
+      .thenReturn(blockingFlows, emptyList());
+    when(flowRecoveryService.recover(blockingFlows)).thenReturn(true);
+
+    validator.validate(request);
+
+    verify(applicationFlowService, org.mockito.Mockito.times(2))
+      .findLastFlowsByNames(getApplicationNames(request), TENANT_ID);
+    verify(flowRecoveryService).recover(blockingFlows);
   }
 
   @Test

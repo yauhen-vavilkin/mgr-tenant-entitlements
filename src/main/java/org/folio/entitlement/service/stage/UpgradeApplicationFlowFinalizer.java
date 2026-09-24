@@ -31,6 +31,9 @@ public class UpgradeApplicationFlowFinalizer
 
   @Override
   protected void afterFlowStatusUpdate(ApplicationStageContext context) {
+    if (context.getFenceToken() != null && !context.isFenceWriteSucceeded()) {
+      return;
+    }
     var tenantId = context.getTenantId();
     entitlementCrudService.delete(buildEntitlement(tenantId, context.getEntitledApplicationId()));
     entitlementCrudService.save(buildEntitlement(tenantId, context.getApplicationId()));

@@ -1,0 +1,100 @@
+package org.folio.entitlement.service.flow;
+
+import static org.folio.entitlement.domain.entity.type.EntityExecutionStatus.INTERRUPTED;
+import static org.folio.entitlement.domain.entity.type.EntityExecutionStatus.NON_TERMINAL_STATUSES;
+
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.util.HashSet;
+import java.util.List;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
+import org.folio.entitlement.domain.dto.ApplicationFlow;
+import org.folio.entitlement.domain.entity.type.EntityExecutionStatus;
+import org.folio.entitlement.repository.ApplicationFlowRepository;
+import org.folio.entitlement.repository.FlowRepository;
+import org.folio.entitlement.service.InstanceHeartbeatService;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/** Reclaims blocking application flows whose owning MTE instance is no longer alive. */
+@Log4j2
+@Service
+@RequiredArgsConstructor
+public class FlowRecoveryService {
+
+  private final FlowRepository flowRepository;
+  private final ApplicationFlowRepository applicationFlowRepository;
+  private final InstanceHeartbeatService heartbeatService;
+
+  /** Recovers each distinct stale parent flow represented by the validation result. */
+  @Transactional
+  public boolean recover(List<ApplicationFlow> applicationFlows) {
+    try {
+      var recoveredFlowIds = new HashSet<UUID>();
+      var recoveryAttempted = false;
+      for (var applicationFlow : applicationFlows) {
+        if (isBlocking(applicationFlow) && applicationFlow.getFlowId() != null
+            && recoveredFlowIds.add(applicationFlow.getFlowId())) {
+          recoveryAttempted |= recoverFlow(applicationFlow.getFlowId());
+        }
+      }
+      return recoveryAttempted;
+    } catch (RuntimeException e) {
+      log.error("Failed to recover orphaned entitlement flow", e);
+      throw new IllegalStateException("Failed to recover orphaned entitlement flow", e);
+    }
+  }
+
+  private boolean recoverFlow(UUID flowId) {
+    var flow = flowRepository.findById(flowId);
+    if (flow.isEmpty()) {
+      var applicationFlows = applicationFlowRepository.updateStatusByFlowIdIfCurrentIn(
+        flowId, INTERRUPTED, NON_TERMINAL_STATUSES, ZonedDateTime.now(ZoneId.systemDefault()));
+      log.warn("Recovered orphaned application-flow rows because parent flow was not found [flowId: {}, "
+          + "applicationFlows: {}, outcome: {}]", flowId, applicationFlows, INTERRUPTED);
+      return true;
+    }
+
+    var parent = flow.get();
+    var owner = parent.getOwnerInstanceId();
+    if (NON_TERMINAL_STATUSES.contains(parent.getStatus()) && owner != null && heartbeatService.isAlive(owner)) {
+      log.info("Flow recovery skipped because owner is alive [flowId: {}, ownerInstanceId: {}]", flowId, owner);
+      return false;
+    }
+
+    return interruptFlow(flowId, owner, parent.getFenceToken());
+  }
+
+  private boolean interruptFlow(UUID flowId, UUID owner, Long fenceToken) {
+    var finishedAt = ZonedDateTime.now(ZoneId.systemDefault());
+    var flowUpdated = fenceToken == null
+      ? flowRepository.updateStatusIfCurrentIn(flowId, INTERRUPTED, NON_TERMINAL_STATUSES, finishedAt)
+      : flowRepository.updateStatusIfCurrentInAndFenceToken(
+        flowId, INTERRUPTED, NON_TERMINAL_STATUSES, finishedAt, fenceToken);
+    if (flowUpdated == 0 && fenceToken != null) {
+      log.info("Flow recovery lost the ownership fence race [flowId: {}, previousOwnerInstanceId: {}, "
+          + "observedFenceToken: {}]", flowId, owner, fenceToken);
+      // The root CAS is the ownership decision.  A losing worker must not use the token it observed before the
+      // race to touch child rows; the validator will reload them after this method returns.
+      flowRepository.findById(flowId);
+      return true;
+    }
+
+    var applicationFlows = fenceToken == null
+      ? applicationFlowRepository.updateStatusByFlowIdIfCurrentIn(
+        flowId, INTERRUPTED, NON_TERMINAL_STATUSES, finishedAt)
+      : applicationFlowRepository.updateStatusByFlowIdIfCurrentInAndFenceToken(
+        flowId, INTERRUPTED, NON_TERMINAL_STATUSES, finishedAt, fenceToken + 1);
+    log.warn("Orphaned flow recovered [flowId: {}, previousOwnerInstanceId: {}, observedFenceToken: {}, "
+        + "rootUpdated: {}, applicationFlows: {}, outcome: {}]",
+      flowId, owner, fenceToken, flowUpdated, applicationFlows, INTERRUPTED);
+    return true;
+  }
+
+  private boolean isBlocking(ApplicationFlow applicationFlow) {
+    return applicationFlow.getStatus() != null
+      && NON_TERMINAL_STATUSES.contains(EntityExecutionStatus.from(applicationFlow.getStatus()));
+  }
+}

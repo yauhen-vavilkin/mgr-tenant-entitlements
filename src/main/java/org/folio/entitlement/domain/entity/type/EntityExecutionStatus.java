@@ -11,6 +11,7 @@ public enum EntityExecutionStatus {
   IN_PROGRESS,
   CANCELLED,
   CANCELLATION_FAILED,
+  INTERRUPTED,
   FAILED,
   FINISHED;
 

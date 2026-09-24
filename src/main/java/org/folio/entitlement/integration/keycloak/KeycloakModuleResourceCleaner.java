@@ -17,6 +17,9 @@ public class KeycloakModuleResourceCleaner extends ModuleDatabaseLoggingStage {
 
   @Override
   public void execute(ModuleStageContext context) {
+    if (!guardFenceToken(context)) {
+      return;
+    }
     threadLocalModuleStageContext.set(context);
 
     var request = context.getEntitlementRequest();

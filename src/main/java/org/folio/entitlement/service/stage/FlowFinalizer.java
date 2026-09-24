@@ -31,6 +31,12 @@ public abstract class FlowFinalizer extends AbstractFlowFinalizer<FlowEntity, Co
   @Transactional
   public void execute(CommonStageContext context) {
     super.execute(context);
+    if (context.getFenceToken() != null && !context.isFenceWriteSucceeded()) {
+      return;
+    }
+    if (!guardFenceToken(context)) {
+      return;
+    }
     applicationFlowService.removeAllQueuedFlows(context.getCurrentFlowId());
   }
 }

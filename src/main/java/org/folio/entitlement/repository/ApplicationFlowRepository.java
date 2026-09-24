@@ -70,18 +70,53 @@ public interface ApplicationFlowRepository extends AbstractFlowRepository<Applic
     @Param("currentStatuses") Collection<EntityExecutionStatus> currentStatuses,
     @Param("finishedAt") ZonedDateTime finishedAt);
 
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query("UPDATE ApplicationFlowEntity e SET e.status = :status, e.finishedAt = :finishedAt "
+    + "WHERE e.id = :id AND e.status IN :currentStatuses "
+    + "AND EXISTS (SELECT f.id FROM FlowEntity f WHERE f.id = e.flowId "
+    + "AND f.status IN :currentStatuses AND f.fenceToken = :fenceToken)")
+  int updateStatusIfCurrentInAndFlowActiveAndFenceToken(@Param("id") UUID id,
+    @Param("status") EntityExecutionStatus status,
+    @Param("currentStatuses") Collection<EntityExecutionStatus> currentStatuses,
+    @Param("finishedAt") ZonedDateTime finishedAt, @Param("fenceToken") Long fenceToken);
+
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query("UPDATE ApplicationFlowEntity e SET e.status = :status, e.finishedAt = :finishedAt "
+    + "WHERE e.id = :id AND e.status IN :currentStatuses "
+    + "AND EXISTS (SELECT f.id FROM FlowEntity f WHERE f.id = e.flowId AND f.fenceToken = :fenceToken)")
+  int updateStatusIfCurrentInAndFenceToken(@Param("id") UUID id,
+    @Param("status") EntityExecutionStatus status,
+    @Param("currentStatuses") Collection<EntityExecutionStatus> currentStatuses,
+    @Param("finishedAt") ZonedDateTime finishedAt, @Param("fenceToken") Long fenceToken);
+
   /**
    * Compare-and-set on the statuses of all application flows of the given flow: the status check is a part of the
    * statement, so a status set concurrently by a finalizer stage cannot be overwritten. {@code finishedAt} is passed
    * in because a bulk update bypasses {@link org.hibernate.annotations.UpdateTimestamp}.
    */
-  @Modifying
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query("UPDATE ApplicationFlowEntity e SET e.status = :status, e.finishedAt = :finishedAt "
     + "WHERE e.flowId = :flowId AND e.status IN :currentStatuses")
   int updateStatusByFlowIdIfCurrentIn(@Param("flowId") UUID flowId,
     @Param("status") EntityExecutionStatus status,
     @Param("currentStatuses") Collection<EntityExecutionStatus> currentStatuses,
     @Param("finishedAt") ZonedDateTime finishedAt);
+
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query("UPDATE ApplicationFlowEntity e SET e.status = :status, e.finishedAt = :finishedAt "
+    + "WHERE e.flowId = :flowId AND e.status IN :currentStatuses "
+    + "AND EXISTS (SELECT f.id FROM FlowEntity f WHERE f.id = e.flowId AND f.fenceToken = :fenceToken)")
+  int updateStatusByFlowIdIfCurrentInAndFenceToken(@Param("flowId") UUID flowId,
+    @Param("status") EntityExecutionStatus status,
+    @Param("currentStatuses") Collection<EntityExecutionStatus> currentStatuses,
+    @Param("finishedAt") ZonedDateTime finishedAt, @Param("fenceToken") Long fenceToken);
+
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query("UPDATE ApplicationFlowEntity e SET e.awaitingAsyncSince = :awaitingAsyncSince "
+    + "WHERE e.id = :id AND e.awaitingAsyncSince IS NULL "
+    + "AND EXISTS (SELECT f.id FROM FlowEntity f WHERE f.id = e.flowId AND f.fenceToken = :fenceToken)")
+  int markAwaitingAsyncWithFenceToken(@Param("id") UUID id,
+    @Param("awaitingAsyncSince") ZonedDateTime awaitingAsyncSince, @Param("fenceToken") Long fenceToken);
 
   @Override
   @Query("""

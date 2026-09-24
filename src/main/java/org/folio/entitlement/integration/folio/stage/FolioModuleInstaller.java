@@ -17,6 +17,9 @@ public class FolioModuleInstaller extends ModuleDatabaseLoggingStage {
 
   @Override
   public void execute(ModuleStageContext context) {
+    if (!guardFenceToken(context)) {
+      return;
+    }
     threadLocalModuleStageContext.set(context);
 
     var moduleRequest = ModuleRequest.fromStageContext(context);
@@ -27,6 +30,9 @@ public class FolioModuleInstaller extends ModuleDatabaseLoggingStage {
 
   @Override
   public void cancel(ModuleStageContext context) {
+    if (!guardFenceToken(context)) {
+      return;
+    }
     var request = context.getEntitlementRequest();
     var moduleRequest = ModuleRequest.fromStageContext(context, request.isPurgeOnRollback());
     folioModuleService.disable(moduleRequest);

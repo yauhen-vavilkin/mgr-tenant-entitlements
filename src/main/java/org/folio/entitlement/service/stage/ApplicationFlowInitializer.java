@@ -31,8 +31,12 @@ public class ApplicationFlowInitializer extends DatabaseLoggingStage<Application
   @Transactional
   public void execute(ApplicationStageContext context) {
     var applicationFlowId = context.getCurrentFlowId();
-    var updated = applicationFlowRepository.updateStatusIfCurrentInAndFlowActive(
-      applicationFlowId, IN_PROGRESS, NON_TERMINAL_STATUSES, ZonedDateTime.now(ZoneId.systemDefault()));
+    var fenceToken = context.getFenceToken();
+    var updated = fenceToken == null
+      ? applicationFlowRepository.updateStatusIfCurrentInAndFlowActive(
+        applicationFlowId, IN_PROGRESS, NON_TERMINAL_STATUSES, ZonedDateTime.now(ZoneId.systemDefault()))
+      : applicationFlowRepository.updateStatusIfCurrentInAndFlowActiveAndFenceToken(
+        applicationFlowId, IN_PROGRESS, NON_TERMINAL_STATUSES, ZonedDateTime.now(ZoneId.systemDefault()), fenceToken);
 
     if (updated == 0) {
       throw new IllegalStateException(String.format(

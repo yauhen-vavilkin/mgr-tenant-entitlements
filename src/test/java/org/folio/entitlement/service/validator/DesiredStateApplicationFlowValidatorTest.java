@@ -15,6 +15,9 @@ import static org.folio.entitlement.support.TestConstants.FLOW_ID;
 import static org.folio.entitlement.support.TestConstants.TENANT_ID;
 import static org.folio.entitlement.support.TestUtils.verifyNoMoreInteractions;
 import static org.folio.entitlement.support.TestValues.commonStageContext;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
@@ -31,6 +34,7 @@ import org.folio.entitlement.domain.model.CommonStageContext;
 import org.folio.entitlement.domain.model.EntitlementRequest;
 import org.folio.entitlement.exception.RequestValidationException;
 import org.folio.entitlement.service.flow.ApplicationFlowService;
+import org.folio.entitlement.service.flow.FlowRecoveryService;
 import org.folio.test.types.UnitTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -48,9 +52,11 @@ class DesiredStateApplicationFlowValidatorTest {
 
   @InjectMocks private DesiredStateApplicationFlowValidator validator;
   @Mock private ApplicationFlowService applicationFlowService;
+  @Mock private FlowRecoveryService flowRecoveryService;
 
   @AfterEach
   void tearDown() {
+    verify(flowRecoveryService, atLeast(0)).recover(any());
     verifyNoMoreInteractions(this);
   }
 
@@ -109,6 +115,22 @@ class DesiredStateApplicationFlowValidatorTest {
     var context = createContext(plan);
 
     assertThatCode(() -> validator.execute(context)).doesNotThrowAnyException();
+  }
+
+  @Test
+  void execute_rechecksFlowsAfterRecovery() {
+    var plan = ApplicationStateTransitionPlan.of(Set.of(APP1_ID), emptySet(), emptySet());
+    var context = createContext(plan);
+    var staleFlow = createApplicationFlow(APP1_ID, ENTITLE, QUEUED);
+    var flowQuery = List.of("app1");
+
+    when(applicationFlowService.findLastFlowsByNames(flowQuery, TENANT_ID))
+      .thenReturn(List.of(staleFlow), Collections.emptyList());
+    when(flowRecoveryService.recover(List.of(staleFlow))).thenReturn(true);
+
+    assertThatCode(() -> validator.execute(context)).doesNotThrowAnyException();
+    verify(applicationFlowService, org.mockito.Mockito.times(2))
+      .findLastFlowsByNames(flowQuery, TENANT_ID);
   }
 
   @Test

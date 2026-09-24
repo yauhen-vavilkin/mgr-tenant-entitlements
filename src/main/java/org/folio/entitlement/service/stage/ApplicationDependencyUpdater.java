@@ -13,6 +13,9 @@ public class ApplicationDependencyUpdater extends DatabaseLoggingStage<Applicati
 
   @Override
   public void execute(ApplicationStageContext context) {
+    if (!guardFenceToken(context)) {
+      return;
+    }
     var tenantId = context.getTenantId();
     applicationDependencyService.deleteEntitlementDependencies(
       tenantId, context.getEntitledApplicationId(), context.getEntitledApplicationDescriptor().getDependencies());

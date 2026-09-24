@@ -19,6 +19,9 @@ public class SkippedApplicationFlowFinalizer extends DatabaseLoggingStage<Applic
   @Override
   @Transactional
   public void execute(ApplicationStageContext stageContext) {
+    if (!guardFenceToken(stageContext)) {
+      return;
+    }
     applicationFlowRepository.removeQueuedFlow(stageContext.getCurrentFlowId());
   }
 }
