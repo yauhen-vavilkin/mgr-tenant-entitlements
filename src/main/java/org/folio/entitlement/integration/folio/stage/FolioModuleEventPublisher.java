@@ -20,6 +20,9 @@ public class FolioModuleEventPublisher extends ModuleDatabaseLoggingStage {
 
   @Override
   public void execute(ModuleStageContext context) {
+    if (!guardFenceToken(context)) {
+      return;
+    }
     var moduleDescriptor = context.getModuleDescriptor();
     var installedModuleDescriptor = context.getInstalledModuleDescriptor();
 
@@ -40,6 +43,9 @@ public class FolioModuleEventPublisher extends ModuleDatabaseLoggingStage {
 
   @Override
   public void cancel(ModuleStageContext context) {
+    if (!guardFenceToken(context)) {
+      return;
+    }
     if (context.getEntitlementType() != ENTITLE) {
       return;
     }

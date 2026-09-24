@@ -22,6 +22,9 @@ public class ApiGatewayModuleRouteUpdater extends ModuleDatabaseLoggingStage {
 
   @Override
   public void execute(ModuleStageContext context) {
+    if (!guardFenceToken(context)) {
+      return;
+    }
     if (context.getModuleType() == ModuleType.UI_MODULE) {
       return;
     }

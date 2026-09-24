@@ -15,6 +15,41 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface FlowRepository extends AbstractFlowRepository<FlowEntity> {
 
+  /**
+   * Compare-and-set status update for a root flow. Every successful root status write advances the fence token.
+   */
+  @Override
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query("UPDATE FlowEntity e SET e.status = :status, e.finishedAt = :finishedAt, "
+    + "e.fenceToken = e.fenceToken + 1 "
+    + "WHERE e.id = :id AND e.status IN :currentStatuses")
+  int updateStatusIfCurrentIn(@Param("id") UUID id,
+    @Param("status") EntityExecutionStatus status,
+    @Param("currentStatuses") Collection<EntityExecutionStatus> currentStatuses,
+    @Param("finishedAt") ZonedDateTime finishedAt);
+
+  /**
+   * Updates a root flow only when the caller still owns the observed fence token. The token is incremented as part
+   * of the same statement, making concurrent reclaim and terminal writes a database compare-and-set operation.
+   */
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query("UPDATE FlowEntity f SET f.status = :status, f.finishedAt = :finishedAt, "
+    + "f.fenceToken = f.fenceToken + 1 "
+    + "WHERE f.id = :flowId AND f.status IN :currentStatuses AND f.fenceToken = :fenceToken")
+  int updateStatusIfCurrentInAndFenceToken(@Param("flowId") UUID flowId,
+    @Param("status") EntityExecutionStatus status,
+    @Param("currentStatuses") Collection<EntityExecutionStatus> currentStatuses,
+    @Param("finishedAt") ZonedDateTime finishedAt, @Param("fenceToken") Long fenceToken);
+
+  /**
+   * Acquires the database row lock for an owner write without changing the fence token. The conditional update
+   * makes the result authoritative: a reclaimed owner gets zero rows and must not continue with child writes.
+   */
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query("UPDATE FlowEntity e SET e.fenceToken = e.fenceToken "
+    + "WHERE e.id = :flowId AND e.fenceToken = :fenceToken")
+  int guardFenceToken(@Param("flowId") UUID flowId, @Param("fenceToken") Long fenceToken);
+
   @Query("SELECT e.status FROM FlowEntity e WHERE e.id = :flowId")
   Optional<EntityExecutionStatus> findStatusById(@Param("flowId") UUID flowId);
 
@@ -32,6 +67,20 @@ public interface FlowRepository extends AbstractFlowRepository<FlowEntity> {
       AND f.awaitingAsyncSince < :cutoff""")
   List<UUID> findIdsAwaitingAsyncBefore(@Param("status") EntityExecutionStatus status,
     @Param("cutoff") ZonedDateTime cutoff);
+
+  @Override
+  @Modifying
+  @Query("UPDATE FlowEntity e SET e.awaitingAsyncSince = :awaitingAsyncSince, "
+    + "e.fenceToken = e.fenceToken + 1 "
+    + "WHERE e.id = :id AND e.awaitingAsyncSince IS NULL")
+  int markAwaitingAsync(@Param("id") UUID id, @Param("awaitingAsyncSince") ZonedDateTime awaitingAsyncSince);
+
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query("UPDATE FlowEntity e SET e.awaitingAsyncSince = :awaitingAsyncSince, "
+    + "e.fenceToken = e.fenceToken + 1 "
+    + "WHERE e.id = :id AND e.awaitingAsyncSince IS NULL AND e.fenceToken = :fenceToken")
+  int markAwaitingAsyncWithFenceToken(@Param("id") UUID id,
+    @Param("awaitingAsyncSince") ZonedDateTime awaitingAsyncSince, @Param("fenceToken") Long fenceToken);
 
   @Override
   @Query("""
@@ -54,7 +103,7 @@ public interface FlowRepository extends AbstractFlowRepository<FlowEntity> {
   @Modifying
   @Query("""
     UPDATE FlowEntity f
-    SET f.status = :status, f.finishedAt = :finishedAt
+    SET f.status = :status, f.finishedAt = :finishedAt, f.fenceToken = f.fenceToken + 1
     WHERE f.id = :flowId AND f.status IN :currentStatuses
       AND f.awaitingAsyncSince IS NOT NULL
       AND NOT EXISTS (

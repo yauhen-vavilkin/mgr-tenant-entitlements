@@ -34,6 +34,13 @@ public class KafkaTenantTopicCreator extends DatabaseLoggingStage<CommonStageCon
 
   @Override
   public void execute(CommonStageContext context) {
+    if (!guardFenceToken(context)) {
+      return;
+    }
+    createTopicsIfRequired(context);
+  }
+
+  private void createTopicsIfRequired(CommonStageContext context) {
     if (isEntitleOrDesiredStateWithEntitle(context)) {
       var tenant = getTenant(context);
 
@@ -51,6 +58,9 @@ public class KafkaTenantTopicCreator extends DatabaseLoggingStage<CommonStageCon
 
   @Override
   public void cancel(CommonStageContext context) {
+    if (!guardFenceToken(context)) {
+      return;
+    }
     var topicsCreated = context.<Boolean>get(PARAM_TOPICS_CREATED);
     if (!TRUE.equals(topicsCreated)) {
       return;

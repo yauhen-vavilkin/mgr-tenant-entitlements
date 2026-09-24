@@ -18,6 +18,9 @@ public class ApplicationFlowQueuingStage extends DatabaseLoggingStage<CommonStag
   @Override
   @Transactional
   public void execute(CommonStageContext context) {
+    if (!guardFenceToken(context)) {
+      return;
+    }
     var request = context.getEntitlementRequest();
     var flows = applicationFlowService.createQueuedApplicationFlows(context.getCurrentFlowId(), request);
     var applicationFlowsMap = toHashMap(flows, ApplicationFlow::getApplicationId, ApplicationFlow::getId);

@@ -64,22 +64,32 @@ public class FlowRecoveryService {
       return false;
     }
 
-    return interruptFlow(flowId, owner);
+    return interruptFlow(flowId, owner, parent.getFenceToken());
   }
 
-  private boolean interruptFlow(UUID flowId, UUID owner) {
+  private boolean interruptFlow(UUID flowId, UUID owner, Long fenceToken) {
     var finishedAt = ZonedDateTime.now(ZoneId.systemDefault());
-    var flowUpdated = flowRepository.updateStatusIfCurrentIn(flowId, INTERRUPTED, NON_TERMINAL_STATUSES, finishedAt);
-    var applicationFlows = applicationFlowRepository.updateStatusByFlowIdIfCurrentIn(
-      flowId, INTERRUPTED, NON_TERMINAL_STATUSES, finishedAt);
-    if (flowUpdated == 0 && applicationFlows == 0) {
-      log.info("Flow recovery found no blocking rows to interrupt [flowId: {}, previousOwnerInstanceId: {}]",
-        flowId, owner);
-    } else {
-      log.warn("Orphaned flow recovered [flowId: {}, previousOwnerInstanceId: {}, rootUpdated: {}, "
-          + "applicationFlows: {}, outcome: {}]",
-        flowId, owner, flowUpdated, applicationFlows, INTERRUPTED);
+    var flowUpdated = fenceToken == null
+      ? flowRepository.updateStatusIfCurrentIn(flowId, INTERRUPTED, NON_TERMINAL_STATUSES, finishedAt)
+      : flowRepository.updateStatusIfCurrentInAndFenceToken(
+        flowId, INTERRUPTED, NON_TERMINAL_STATUSES, finishedAt, fenceToken);
+    if (flowUpdated == 0 && fenceToken != null) {
+      log.info("Flow recovery lost the ownership fence race [flowId: {}, previousOwnerInstanceId: {}, "
+          + "observedFenceToken: {}]", flowId, owner, fenceToken);
+      // The root CAS is the ownership decision.  A losing worker must not use the token it observed before the
+      // race to touch child rows; the validator will reload them after this method returns.
+      flowRepository.findById(flowId);
+      return true;
     }
+
+    var applicationFlows = fenceToken == null
+      ? applicationFlowRepository.updateStatusByFlowIdIfCurrentIn(
+        flowId, INTERRUPTED, NON_TERMINAL_STATUSES, finishedAt)
+      : applicationFlowRepository.updateStatusByFlowIdIfCurrentInAndFenceToken(
+        flowId, INTERRUPTED, NON_TERMINAL_STATUSES, finishedAt, fenceToken + 1);
+    log.warn("Orphaned flow recovered [flowId: {}, previousOwnerInstanceId: {}, observedFenceToken: {}, "
+        + "rootUpdated: {}, applicationFlows: {}, outcome: {}]",
+      flowId, owner, fenceToken, flowUpdated, applicationFlows, INTERRUPTED);
     return true;
   }
 

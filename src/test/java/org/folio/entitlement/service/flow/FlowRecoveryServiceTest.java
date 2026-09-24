@@ -121,6 +121,26 @@ class FlowRecoveryServiceTest {
     verify(applicationFlowRepository).updateStatusByFlowIdIfCurrentIn(eq(FLOW_ID), eq(INTERRUPTED), any(), any());
   }
 
+  @Test
+  void recover_doesNotUpdateChildrenWhenFencedRootUpdateLosesRaceAndReloadsRoot() {
+    var parent = parent(QUEUED, OWNER_ID);
+    parent.setFenceToken(4L);
+    var service = service();
+    when(flowRepository.findById(FLOW_ID)).thenReturn(Optional.of(parent), Optional.of(parent));
+    when(heartbeatService.isAlive(OWNER_ID)).thenReturn(false);
+    when(flowRepository.updateStatusIfCurrentInAndFenceToken(
+      eq(FLOW_ID), eq(INTERRUPTED), any(), any(), eq(4L))).thenReturn(0);
+
+    var result = service.recover(List.of(applicationFlow(QUEUED, FLOW_ID)));
+
+    assertThat(result).isTrue();
+    verify(flowRepository).updateStatusIfCurrentInAndFenceToken(
+      eq(FLOW_ID), eq(INTERRUPTED), any(), any(), eq(4L));
+    verify(flowRepository, org.mockito.Mockito.times(2)).findById(FLOW_ID);
+    verify(applicationFlowRepository, never()).updateStatusByFlowIdIfCurrentInAndFenceToken(
+      any(), any(), any(), any(), any());
+  }
+
   private FlowRecoveryService service() {
     return new FlowRecoveryService(flowRepository, applicationFlowRepository, heartbeatService);
   }

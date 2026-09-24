@@ -24,6 +24,9 @@ public class RevokeApplicationFlowFinalizer
 
   @Override
   protected void afterFlowStatusUpdate(ApplicationStageContext context) {
+    if (context.getFenceToken() != null && !context.isFenceWriteSucceeded()) {
+      return;
+    }
     var applicationId = context.getApplicationId();
     var entitlement = new Entitlement().applicationId(applicationId).tenantId(context.getTenantId());
     entitlementCrudService.delete(entitlement);
