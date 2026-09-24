@@ -198,6 +198,11 @@ application:
   async-confirmation:
     timeout: ${ASYNC_CONFIRMATION_TIMEOUT:90m}
     sweep-interval: ${ASYNC_CONFIRMATION_SWEEP_INTERVAL:5m}
+  instance-heartbeat:
+    interval: ${MTE_INSTANCE_HEARTBEAT_INTERVAL:10s}
+    stale-threshold: ${MTE_INSTANCE_HEARTBEAT_STALE_THRESHOLD:30s}
+    cleanup-interval: ${MTE_INSTANCE_HEARTBEAT_CLEANUP_INTERVAL:24h}
+    retention: ${MTE_INSTANCE_HEARTBEAT_RETENTION:24h}
 
 folio:
   jpa:

@@ -9,4 +9,5 @@
   <include file="changes.v4.0.0/add-id-to-flow-stage.xml" relativeToChangelogFile="true"/>
   <include file="changes.v4.0.0/add-awaiting-async-since-to-flows.xml" relativeToChangelogFile="true"/>
   <include file="changes.v4.0.0/add-owner-instance-id-to-flow.xml" relativeToChangelogFile="true"/>
+  <include file="changes.v4.0.0/create-mte-instance-table.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>
