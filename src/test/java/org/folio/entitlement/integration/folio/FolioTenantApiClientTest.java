@@ -4,6 +4,7 @@ import static java.net.http.HttpResponse.BodyHandlers.ofString;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.folio.common.utils.OkapiHeaders.TENANT;
+import static org.folio.entitlement.integration.folio.FolioTenantApiClient.EGRESS_USE_GATEWAY;
 import static org.folio.entitlement.support.TestConstants.TENANT_ID;
 import static org.folio.entitlement.support.TestConstants.TENANT_NAME;
 import static org.folio.entitlement.support.TestUtils.JACKSON3_OBJECT_MAPPER;
@@ -225,6 +226,7 @@ class FolioTenantApiClientTest {
       .POST(BodyPublishers.ofString(asJsonString(tenantAttributesForInstall())))
       .header(CONTENT_TYPE, APPLICATION_JSON_VALUE)
       .header(TENANT, TENANT_NAME)
+      .header(EGRESS_USE_GATEWAY, "true")
       .version(Version.HTTP_1_1)
       .build();
   }
@@ -235,6 +237,7 @@ class FolioTenantApiClientTest {
       .POST(BodyPublishers.ofString(asJsonString(tenantAttributesForUninstall())))
       .header(CONTENT_TYPE, APPLICATION_JSON_VALUE)
       .header(TENANT, TENANT_NAME)
+      .header(EGRESS_USE_GATEWAY, "true")
       .version(Version.HTTP_1_1)
       .build();
   }
@@ -245,6 +248,7 @@ class FolioTenantApiClientTest {
       .method("DELETE", BodyPublishers.ofString(asJsonString(tenantAttributesForUninstall())))
       .header(CONTENT_TYPE, APPLICATION_JSON_VALUE)
       .header(TENANT, TENANT_NAME)
+      .header(EGRESS_USE_GATEWAY, "true")
       .version(Version.HTTP_1_1)
       .build();
   }
@@ -255,6 +259,7 @@ class FolioTenantApiClientTest {
       .POST(BodyPublishers.ofString(asJsonString(tenantAttributesForUninstall(false))))
       .header(CONTENT_TYPE, APPLICATION_JSON_VALUE)
       .header(TENANT, TENANT_NAME)
+      .header(EGRESS_USE_GATEWAY, "true")
       .version(Version.HTTP_1_1)
       .build();
   }

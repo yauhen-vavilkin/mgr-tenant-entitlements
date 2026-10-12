@@ -22,6 +22,7 @@
 * Accept a tenant collection name (e.g. `ALL`) in `KAFKA_PRODUCER_TENANT_COLLECTION`, as other FOLIO modules do (MGRENTITLE-202)
 * Add `x-okapi-tenant` and `folio.tenantId` Kafka headers to published events (MGRENTITLE-203)
 * Add DeployConfig.json to mgr-tenant-entitlements (ADR-0013 Configuration Management) ([MGRENTITLE-193](https://folio-org.atlassian.net/browse/MGRENTITLE-193))
+* Send `x-okapi-egress-use-gateway: true` on tenant API calls so module outbound requests during an upgrade are routed via the API gateway to the updated module versions (MGRENTITLE-229)
 ---
 
 ## Version `4.0.0` (16.04.2026)
