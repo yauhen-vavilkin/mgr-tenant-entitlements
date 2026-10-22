@@ -3,6 +3,7 @@ package org.folio.entitlement.repository;
 import java.time.ZonedDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.folio.entitlement.domain.entity.ApplicationFlowEntity;
 import org.folio.entitlement.domain.entity.type.EntityExecutionStatus;
@@ -47,6 +48,14 @@ public interface ApplicationFlowRepository extends AbstractFlowRepository<Applic
           AND af.application_name = laf.application_name""")
   List<ApplicationFlowEntity> findLastFlowsByApplicationNames(
     @Param("application_names") Collection<String> applicationNames, @Param("tenant_id") UUID tenantId);
+
+  /**
+   * Resolves the owner instance id of an application flow through its parent root flow.
+   * Empty when the row is missing or the root flow has a null owner (legacy rows).
+   */
+  @Query("SELECT f.ownerInstanceId FROM ApplicationFlowEntity e, FlowEntity f "
+    + "WHERE e.id = :id AND f.id = e.flowId")
+  Optional<String> findOwnerInstanceId(@Param("id") UUID id);
 
   @Modifying
   @Query("DELETE ApplicationFlowEntity entity WHERE entity.flowId = :flowId and entity.status = 'QUEUED'")
