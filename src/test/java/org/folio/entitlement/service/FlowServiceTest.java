@@ -182,6 +182,36 @@ class FlowServiceTest {
     }
 
     @Test
+    void positive_stampsOwnerInstanceId() {
+      var flow = flow();
+      var flowEntity = flowEntity();
+
+      when(flowRepository.findStatusById(FLOW_ID)).thenReturn(Optional.empty());
+      when(flowMapper.map(flow)).thenReturn(flowEntity);
+      when(flowRepository.save(flowEntity)).thenReturn(flowEntity);
+      when(flowMapper.map(flowEntity)).thenReturn(flow);
+
+      flowService.create(flow, "instance-1");
+
+      var captor = ArgumentCaptor.forClass(FlowEntity.class);
+      verify(flowRepository).save(captor.capture());
+      assertThat(captor.getValue().getOwnerInstanceId()).isEqualTo("instance-1");
+    }
+
+    @Test
+    void positive_legacyNullOwnerFlowIsReadable() {
+      var flowEntity = flowEntity();
+      var flow = flow();
+
+      when(flowRepository.getReferenceById(FLOW_ID)).thenReturn(flowEntity);
+      when(flowMapper.map(flowEntity)).thenReturn(flow);
+      when(applicationFlowService.findByFlowId(FLOW_ID, false)).thenReturn(List.of());
+
+      assertThat(flowEntity.getOwnerInstanceId()).isNull();
+      assertThat(flowService.getById(FLOW_ID, false)).isNotNull();
+    }
+
+    @Test
     void negative_flowAlreadyExists() {
       var flow = flow();
 
