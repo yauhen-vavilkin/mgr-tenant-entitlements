@@ -38,7 +38,7 @@ public class FolioTenantApiClient {
    * Instructs the module sidecar to route its outbound calls through the API gateway so calls made while handling a
    * tenant API reach the updated module versions during an upgrade.
    */
-  public static final String EGRESS_USE_GATEWAY = "x-okapi-egress-use-gateway";
+  public static final String EGRESS_USE_GATEWAY_HEADER = "x-okapi-egress-use-gateway";
 
   private final HttpClient httpClient;
   private final JsonConverter jsonConverter;
@@ -115,7 +115,7 @@ public class FolioTenantApiClient {
       .method(httpMethod, BodyPublishers.ofString(jsonBody))
       .header(CONTENT_TYPE, APPLICATION_JSON_VALUE)
       .header(TENANT, request.getTenantName())
-      .header(EGRESS_USE_GATEWAY, "true")
+      .header(EGRESS_USE_GATEWAY_HEADER, "true")
       .timeout(clientConfiguration.getReadTimeout())
       .version(HTTP_1_1)
       .build();
