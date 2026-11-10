@@ -28,6 +28,8 @@
   publisher/topic exists) ([MGRENTITLE-211](https://folio-org.atlassian.net/browse/MGRENTITLE-211))
 * Allow entitlement of modules that provide no interfaces without discovery information ([MGRENTITLE-210](https://folio-org.atlassian.net/browse/MGRENTITLE-210))
 * Adjust /entitlements/{tenant}/applications by caches ([MGRENTITLE-87](https://folio-org.atlassian.net/browse/MGRENTITLE-87))
+* Suppress WARN log messages for 2xx responses from module `_tenant` API calls; RMB/vert.x modules responding
+  with 201 are treated the same as spring-based modules responding with 204 (MGRENTITLE-160)
 ---
 
 ## Version `4.0.0` (16.04.2026)

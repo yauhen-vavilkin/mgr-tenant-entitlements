@@ -6,7 +6,6 @@ import static org.folio.common.utils.OkapiHeaders.TENANT;
 import static org.folio.entitlement.utils.TenantApiUtils.DISABLE_TENANT_ENDPOINT;
 import static org.folio.entitlement.utils.TenantApiUtils.TENANT_ENDPOINT;
 import static org.springframework.http.HttpHeaders.CONTENT_TYPE;
-import static org.springframework.http.HttpStatus.NO_CONTENT;
 import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 
 import java.io.IOException;
@@ -97,8 +96,9 @@ public class FolioTenantApiClient {
         List.of(new Parameter().key("cause").value(format("%s: %s", statusCode, responseBody))), statusCode);
     }
 
-    if (statusCode != NO_CONTENT.value()) {
-      log.debug("Module responded with code: {}, expected '[204] No Content' [moduleId='{}', url={}, tenant='{}']",
+    if (statusCode < 200 || statusCode >= 300) {
+      log.debug("Module responded with unexpected code: {}, expected a 2xx response "
+        + "[moduleId='{}', url={}, tenant='{}']",
         statusCode, request.getModuleId(), request.getLocation(), request.getTenantName());
     }
   }

@@ -90,6 +90,19 @@ class FolioTenantApiClientTest {
   }
 
   @Test
+  void install_positive_statusEqualToOk() throws IOException, InterruptedException {
+    when(folioClientConfigurationProperties.getReadTimeout()).thenReturn(Duration.ofSeconds(1));
+    when(httpClient.send(httpRequestCaptor.capture(), eq(ofString()))).thenReturn(httpResponse);
+    when(httpResponse.statusCode()).thenReturn(200);
+
+    var parameters = List.of(new Parameter().key("loadReference").value("true"));
+    folioTenantApiClient.install(moduleRequest(parameters));
+
+    verifyHttpRequest(installRequest(), httpRequestCaptor.getValue(), 82);
+    verify(jsonConverter).toJson(tenantAttributesForInstall());
+  }
+
+  @Test
   void install_negative_invalidResponse() throws IOException, InterruptedException {
     when(folioClientConfigurationProperties.getReadTimeout()).thenReturn(Duration.ofSeconds(1));
     when(httpClient.send(httpRequestCaptor.capture(), eq(ofString()))).thenReturn(httpResponse);
